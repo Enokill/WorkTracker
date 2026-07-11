@@ -3,6 +3,7 @@ import {
   WorkEntry,
   AppSettings,
   CustomDateColor,
+  BackupData,
   getAllEntries,
   saveEntry as storageSaveEntry,
   deleteEntry as storageDeleteEntry,
@@ -15,6 +16,8 @@ import {
   getMonthKey,
   getWeekDates,
   formatDate,
+  exportBackup,
+  importBackup,
 } from '@/services/storage';
 
 interface AppContextType {
@@ -40,6 +43,8 @@ interface AppContextType {
   updateAdvanceSalary: (amount: number) => Promise<void>;
   getEntryForDate: (date: string) => WorkEntry | undefined;
   refresh: () => Promise<void>;
+  createBackup: () => Promise<BackupData>;
+  restoreBackup: (data: BackupData) => Promise<void>;
 
   // Computed
   weekTotal: number;
@@ -131,6 +136,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const createBackup = useCallback(async (): Promise<BackupData> => {
+    return exportBackup();
+  }, []);
+
+  const restoreBackup = useCallback(async (data: BackupData): Promise<void> => {
+    await importBackup(data);
+    await loadData();
+  }, [loadData]);
+
   const updateAdvanceSalary = useCallback(async (amount: number) => {
     const mk = getMonthKey(currentYear, currentMonth);
     await storageSaveAdvanceSalary(mk, amount);
@@ -176,6 +190,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateAdvanceSalary,
       getEntryForDate,
       refresh,
+      createBackup,
+      restoreBackup,
       weekTotal,
       monthTotal,
       weekEarnings,

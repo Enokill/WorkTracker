@@ -10,6 +10,7 @@ export interface WorkEntry {
 
 export interface AppSettings {
   ratePerUnit: number;
+  username?: string;
 }
 
 export interface CustomDateColor {
@@ -22,6 +23,15 @@ const KEYS = {
   DATE_COLORS: 'date_colors',
   ADVANCE: 'advance_salary',
 };
+
+export interface BackupData {
+  version: number;
+  exportedAt: string;
+  entries: WorkEntry[];
+  settings: AppSettings;
+  dateColors: CustomDateColor;
+  advanceKeys: Array<{ key: string; value: number }>;
+}
 
 // Work Entries
 export async function getAllEntries(): Promise<WorkEntry[]> {
@@ -122,6 +132,42 @@ export function getWeekDates(): string[] {
 
 export function formatDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// ─── Backup & Restore ───────────────────────────────────────────────────────
+
+export async function exportBackup(): Promise<BackupData> {
+  const entries = await getAllEntries();
+  const settings = await getSettings();
+  const dateColors = await getDateColors();
+
+  // Collect all advance salary keys
+  const allKeys = await AsyncStorage.getAllKeys();
+  const advanceKeys: Array<{ key: string; value: number }> = [];
+  for (const k of allKeys) {
+    if (k.startsWith(KEYS.ADVANCE + '_')) {
+      const raw = await AsyncStorage.getItem(k);
+      advanceKeys.push({ key: k, value: raw ? parseFloat(raw) : 0 });
+    }
+  }
+
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    entries,
+    settings,
+    dateColors,
+    advanceKeys,
+  };
+}
+
+export async function importBackup(data: BackupData): Promise<void> {
+  await AsyncStorage.setItem(KEYS.ENTRIES, JSON.stringify(data.entries));
+  await AsyncStorage.setItem(KEYS.SETTINGS, JSON.stringify(data.settings));
+  await AsyncStorage.setItem(KEYS.DATE_COLORS, JSON.stringify(data.dateColors));
+  for (const { key, value } of data.advanceKeys) {
+    await AsyncStorage.setItem(key, value.toString());
+  }
 }
 
 export function parseDate(s: string): Date {
