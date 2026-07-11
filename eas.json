@@ -1,11 +1,20 @@
 {
+  "cli": {
+    "npmClient": "npm"
+  },
   "build": {
     "production": {
       "android": {
-        "image": "latest"
+        "image": "latest",
+        "gradleCommand": ":app:assembleRelease"
       },
       "ios": {
         "image": "latest"
+      }
+    },
+    "preview": {
+      "android": {
+        "buildType": "apk"
       }
     }
   }
