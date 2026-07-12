@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
@@ -24,7 +24,6 @@ function formatRupee(n: number): string {
 export default function EntryScreen() {
   const { date } = useLocalSearchParams<{ date: string }>();
   const router = useRouter();
-  const navigation = useNavigation();
   const { getEntryForDate, saveEntry, deleteEntry, settings } = useApp();
   const { showAlert } = useAlert();
 
@@ -44,12 +43,6 @@ export default function EntryScreen() {
 
   const count = parseInt(workCount) || 0;
   const earnings = count * settings.ratePerUnit;
-
-  useEffect(() => {
-    navigation.setOptions({
-      title: existing ? 'Edit Entry' : 'Log Work',
-    });
-  }, [existing]);
 
   const handleSave = async () => {
     const countVal = parseInt(workCount);
@@ -86,7 +79,9 @@ export default function EntryScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
+    <>
+      <Stack.Screen options={{ title: existing ? 'Edit Entry' : 'Log Work', headerShown: true }} />
+      <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
@@ -177,7 +172,8 @@ export default function EntryScreen() {
           </Pressable>
         ) : null}
       </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </>
   );
 }
 

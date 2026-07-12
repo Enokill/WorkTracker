@@ -79,7 +79,8 @@ export default function MonthlyBarChart({
         if (isSelected) barColor = Colors.primaryDark;
 
         const d = parseDate(bar.date);
-        const weekday = d.toLocaleDateString('en-IN', { weekday: 'short' }).slice(0, 2);
+        const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+        const weekday = WEEKDAYS[d.getDay()];
 
         return (
           <Pressable
