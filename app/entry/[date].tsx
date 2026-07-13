@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, Radius, Shadow } from '@/constants/theme';
+import { Typography, Spacing, Radius, Shadow } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useApp } from '@/hooks/useApp';
 import { useAlert } from '@/template';
 import { parseDate } from '@/services/storage';
@@ -23,6 +24,7 @@ function formatRupee(n: number): string {
 export default function EntryScreen() {
   const { date } = useLocalSearchParams<{ date: string }>();
   const router = useRouter();
+  const { colors } = useTheme();
   const { getEntryForDate, saveEntry, deleteEntry, settings } = useApp();
   const { showAlert } = useAlert();
 
@@ -30,7 +32,7 @@ export default function EntryScreen() {
 
   const [workCount, setWorkCount] = useState(existing ? existing.workCount.toString() : '');
   const [caratWeight, setCaratWeight] = useState(
-    existing && existing.weightInCarats != null ? existing.weightInCarats.toString() : ''
+    existing?.caratWeight != null ? existing.caratWeight.toString() : ''
   );
   const [notes, setNotes] = useState(existing ? existing.notes : '');
   const [saving, setSaving] = useState(false);
@@ -40,13 +42,11 @@ export default function EntryScreen() {
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const dateLabel = `${WEEKDAYS[parsedDate.getDay()]}, ${parsedDate.getDate()} ${MONTHS[parsedDate.getMonth()]} ${parsedDate.getFullYear()}`;
 
-  const unitCount = parseInt(workCount) || 0;
-  const caratCount = parseFloat(caratWeight) || 0;
-  const ratePerUnit = settings.ratePerUnit;
-  const ratePerCarat = settings.ratePerCarat || 0;
-
-  const unitEarnings = unitCount * ratePerUnit;
-  const caratEarnings = caratCount * ratePerCarat;
+  const units = parseInt(workCount) || 0;
+  const carats = parseFloat(caratWeight) || 0;
+  const unitEarnings = units * settings.ratePerUnit;
+  const caratRate = settings.caratRate ?? 100;
+  const caratEarnings = carats * caratRate;
   const totalEarnings = unitEarnings + caratEarnings;
 
   const handleSave = async () => {
@@ -56,16 +56,12 @@ export default function EntryScreen() {
       showAlert('Invalid Entry', 'Values cannot be negative.');
       return;
     }
-    if (countVal === 0 && caratVal === 0 && !notes.trim()) {
-      showAlert('Empty Entry', 'Please enter at least a work count, carat weight, or a note.');
-      return;
-    }
     if (!date) return;
     setSaving(true);
     await saveEntry({
       date,
       workCount: countVal,
-      weightInCarats: caratVal > 0 ? caratVal : undefined,
+      caratWeight: caratVal > 0 ? caratVal : undefined,
       notes: notes || '',
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -76,26 +72,21 @@ export default function EntryScreen() {
 
   const handleDelete = () => {
     if (!date || !existing) return;
-    showAlert('Delete Entry', 'Remove this work entry? This cannot be undone.', [
+    showAlert('Delete Entry', 'Remove this work entry?', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteEntry(date);
-          router.back();
-        },
+        text: 'Delete', style: 'destructive',
+        onPress: async () => { await deleteEntry(date); router.back(); },
       },
     ]);
   };
 
+  const styles = makeStyles(colors);
+
   return (
     <>
       <Stack.Screen options={{ title: existing ? 'Edit Entry' : 'Log Work', headerShown: true }} />
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.content}
@@ -104,138 +95,118 @@ export default function EntryScreen() {
         >
           {/* Date header */}
           <View style={styles.dateCard}>
-            <View style={styles.dateIconWrap}>
-              <MaterialIcons name="event" size={22} color={Colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
+            <MaterialIcons name="event" size={20} color={colors.primary} />
+            <View style={{ flex: 1, marginLeft: Spacing.md }}>
               <Text style={styles.dateText}>{dateLabel}</Text>
-              <View style={styles.ratePills}>
-                <View style={styles.ratePill}>
-                  <MaterialIcons name="bar-chart" size={10} color={Colors.primary} />
-                  <Text style={styles.ratePillText}>₹{ratePerUnit.toFixed(2)}/unit</Text>
-                </View>
-                {ratePerCarat > 0 ? (
-                  <View style={[styles.ratePill, styles.ratePillGold]}>
-                    <Text style={styles.ratePillTextGold}>◆ ₹{ratePerCarat.toFixed(0)}/ct</Text>
-                  </View>
-                ) : null}
-              </View>
+              <Text style={styles.dateSub}>@ ₹{settings.ratePerUnit.toFixed(2)}/unit · ₹{caratRate.toFixed(2)}/carat</Text>
             </View>
           </View>
 
-          {/* ── Work Units section ── */}
-          <View style={styles.sectionBox}>
-            <View style={styles.sectionBoxHeader}>
-              <View style={[styles.sectionBoxIcon, { backgroundColor: Colors.primaryLight }]}>
-                <MaterialIcons name="bar-chart" size={16} color={Colors.primary} />
+          {/* ── Entry Type 1: Work Units ── */}
+          <View style={styles.entryBlock}>
+            <View style={styles.entryBlockHeader}>
+              <View style={[styles.entryTypeTag, { backgroundColor: colors.primaryLight }]}>
+                <MaterialIcons name="bar-chart" size={14} color={colors.primary} />
+                <Text style={[styles.entryTypeText, { color: colors.primary }]}>Work Units</Text>
               </View>
-              <Text style={styles.sectionBoxTitle}>Work Units</Text>
-              {unitCount > 0 ? (
-                <View style={styles.sectionBadge}>
-                  <Text style={styles.sectionBadgeText}>{formatRupee(unitEarnings)}</Text>
-                </View>
-              ) : null}
+              <Text style={styles.entryTypeRate}>₹{settings.ratePerUnit.toFixed(2)}/unit</Text>
             </View>
             <View style={styles.inputWrapper}>
+              <MaterialIcons name="bar-chart" size={20} color={colors.primary} style={{ marginRight: 8 }} />
               <TextInput
                 style={styles.mainInput}
                 value={workCount}
                 onChangeText={setWorkCount}
                 keyboardType="numeric"
                 placeholder="0"
-                placeholderTextColor={Colors.onSurfaceSubtle}
+                placeholderTextColor={colors.onSurfaceSubtle}
                 autoFocus={!existing}
                 returnKeyType="next"
               />
-              <Text style={styles.inputUnit}>units</Text>
+              <Text style={styles.unitLabel}>units</Text>
               {workCount !== '' ? (
                 <Pressable onPress={() => setWorkCount('')} hitSlop={8}>
-                  <MaterialIcons name="clear" size={18} color={Colors.onSurfaceSubtle} />
+                  <MaterialIcons name="clear" size={18} color={colors.onSurfaceSubtle} />
                 </Pressable>
               ) : null}
             </View>
-            {unitCount > 0 ? (
-              <View style={styles.miniEarningsRow}>
-                <Text style={styles.miniFormula}>{unitCount} × ₹{ratePerUnit.toFixed(2)}</Text>
-                <Text style={styles.miniAmount}>{formatRupee(unitEarnings)}</Text>
+            {units > 0 ? (
+              <View style={styles.miniEarning}>
+                <MaterialIcons name="currency-rupee" size={13} color={colors.accent} />
+                <Text style={[styles.miniEarningText, { color: colors.accent }]}>
+                  {units} × ₹{settings.ratePerUnit.toFixed(2)} = {formatRupee(unitEarnings)}
+                </Text>
               </View>
             ) : null}
           </View>
 
-          {/* ── Carat Weight section ── */}
-          <View style={[styles.sectionBox, styles.sectionBoxGold]}>
-            <View style={styles.sectionBoxHeader}>
-              <View style={[styles.sectionBoxIcon, { backgroundColor: Colors.goldLight }]}>
-                <Text style={styles.caratIcon}>◆</Text>
+          {/* ── Entry Type 2: Carat Weight ── */}
+          <View style={styles.entryBlock}>
+            <View style={styles.entryBlockHeader}>
+              <View style={[styles.entryTypeTag, { backgroundColor: colors.accentLight }]}>
+                <MaterialIcons name="diamond" size={14} color={colors.accent} />
+                <Text style={[styles.entryTypeText, { color: colors.accent }]}>Carat Weight</Text>
               </View>
-              <Text style={[styles.sectionBoxTitle, { color: Colors.gold }]}>Carat Weight</Text>
-              {caratCount > 0 ? (
-                <View style={[styles.sectionBadge, styles.sectionBadgeGold]}>
-                  <Text style={[styles.sectionBadgeText, { color: Colors.gold }]}>{formatRupee(caratEarnings)}</Text>
-                </View>
-              ) : null}
+              <Text style={styles.entryTypeRate}>₹{caratRate.toFixed(2)}/carat</Text>
             </View>
-            <View style={[styles.inputWrapper, styles.inputWrapperGold]}>
+            <View style={styles.inputWrapper}>
+              <MaterialIcons name="diamond" size={20} color={colors.accent} style={{ marginRight: 8 }} />
               <TextInput
-                style={[styles.mainInput, { color: Colors.gold }]}
+                style={styles.mainInput}
                 value={caratWeight}
                 onChangeText={setCaratWeight}
                 keyboardType="decimal-pad"
                 placeholder="0.00"
-                placeholderTextColor={Colors.goldBright + '60'}
+                placeholderTextColor={colors.onSurfaceSubtle}
                 returnKeyType="next"
               />
-              <Text style={[styles.inputUnit, { color: Colors.goldMid }]}>carats</Text>
+              <Text style={styles.unitLabel}>ct</Text>
               {caratWeight !== '' ? (
                 <Pressable onPress={() => setCaratWeight('')} hitSlop={8}>
-                  <MaterialIcons name="clear" size={18} color={Colors.goldMid} />
+                  <MaterialIcons name="clear" size={18} color={colors.onSurfaceSubtle} />
                 </Pressable>
               ) : null}
             </View>
-            {caratCount > 0 ? (
-              <View style={styles.miniEarningsRow}>
-                <Text style={[styles.miniFormula, { color: Colors.goldMid }]}>
-                  {caratCount.toFixed(2)} ct × ₹{ratePerCarat.toFixed(0)}
+            {carats > 0 ? (
+              <View style={styles.miniEarning}>
+                <MaterialIcons name="currency-rupee" size={13} color={colors.accentMid} />
+                <Text style={[styles.miniEarningText, { color: colors.accentMid }]}>
+                  {carats} ct × ₹{caratRate.toFixed(2)} = {formatRupee(caratEarnings)}
                 </Text>
-                <Text style={[styles.miniAmount, { color: Colors.gold }]}>{formatRupee(caratEarnings)}</Text>
               </View>
-            ) : (
-              <Text style={styles.caratHint}>
-                Set rate per carat in Settings · current: ₹{ratePerCarat.toFixed(0)}/ct
-              </Text>
-            )}
+            ) : null}
           </View>
 
           {/* Total earnings preview */}
-          {totalEarnings > 0 ? (
-            <View style={styles.totalCard}>
-              <View style={styles.totalLeft}>
-                <Text style={styles.totalLabel}>Total Day Earnings</Text>
-                {unitCount > 0 && caratCount > 0 ? (
-                  <Text style={styles.totalBreakdown}>
-                    {formatRupee(unitEarnings)} units + {formatRupee(caratEarnings)} carats
-                  </Text>
-                ) : null}
+          {(units > 0 || carats > 0) ? (
+            <View style={styles.earningsCard}>
+              <View style={styles.earningsRow}>
+                <View>
+                  <Text style={[styles.earningsLabel, { color: colors.primary }]}>Today's Total Earnings</Text>
+                  <View style={{ marginTop: 4 }}>
+                    {units > 0 ? (
+                      <Text style={styles.earningsLine}>Units: {formatRupee(unitEarnings)}</Text>
+                    ) : null}
+                    {carats > 0 ? (
+                      <Text style={styles.earningsLine}>Carats: {formatRupee(caratEarnings)}</Text>
+                    ) : null}
+                  </View>
+                </View>
+                <Text style={[styles.earningsAmount, { color: colors.primary }]}>{formatRupee(totalEarnings)}</Text>
               </View>
-              <Text style={styles.totalAmount}>{formatRupee(totalEarnings)}</Text>
             </View>
           ) : null}
 
           {/* Notes */}
-          <View style={styles.sectionBox}>
-            <View style={styles.sectionBoxHeader}>
-              <View style={[styles.sectionBoxIcon, { backgroundColor: Colors.surfaceVariant }]}>
-                <MaterialIcons name="notes" size={16} color={Colors.onSurfaceVariant} />
-              </View>
-              <Text style={styles.sectionBoxTitle}>Notes (Optional)</Text>
-            </View>
+          <View style={styles.section}>
+            <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>Notes (Optional)</Text>
             <View style={[styles.inputWrapper, styles.notesWrapper]}>
               <TextInput
                 style={[styles.mainInput, styles.notesInput]}
                 value={notes}
                 onChangeText={setNotes}
                 placeholder="Any notes for this day..."
-                placeholderTextColor={Colors.onSurfaceSubtle}
+                placeholderTextColor={colors.onSurfaceSubtle}
                 multiline
                 numberOfLines={3}
                 textAlignVertical="top"
@@ -243,22 +214,22 @@ export default function EntryScreen() {
             </View>
           </View>
 
-          {/* Save button */}
+          {/* Save */}
           <Pressable
-            style={[styles.primaryBtn, saving && { opacity: 0.6 }]}
+            style={[styles.primaryBtn, { backgroundColor: colors.primary }, saving && { opacity: 0.6 }]}
             onPress={handleSave}
             disabled={saving}
           >
-            <MaterialIcons name="check" size={20} color={Colors.onPrimary} />
-            <Text style={styles.primaryBtnText}>
+            <MaterialIcons name="check" size={20} color={colors.onPrimary} />
+            <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>
               {saving ? 'Saving...' : existing ? 'Update Entry' : 'Save Entry'}
             </Text>
           </Pressable>
 
           {existing ? (
-            <Pressable style={styles.deleteBtn} onPress={handleDelete}>
-              <MaterialIcons name="delete-outline" size={18} color={Colors.error} />
-              <Text style={styles.deleteBtnText}>Delete Entry</Text>
+            <Pressable style={[styles.deleteBtn, { borderColor: colors.error + '60', backgroundColor: colors.errorLight }]} onPress={handleDelete}>
+              <MaterialIcons name="delete-outline" size={18} color={colors.error} />
+              <Text style={[styles.deleteBtnText, { color: colors.error }]}>Delete Entry</Text>
             </Pressable>
           ) : null}
         </ScrollView>
@@ -267,181 +238,125 @@ export default function EntryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.lg, paddingBottom: 40 },
+function makeStyles(colors: ReturnType<typeof useTheme>['colors']) {
+  return StyleSheet.create({
+    scroll: { flex: 1, backgroundColor: colors.background },
+    content: { padding: Spacing.lg },
+    dateCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: Spacing.lg,
+      backgroundColor: colors.primaryContainer,
+      borderRadius: Radius.lg,
+      padding: Spacing.lg,
+      borderLeftWidth: 4,
+      borderLeftColor: colors.primary,
+    },
+    dateText: { ...Typography.headlineSmall, color: colors.onSurface },
+    dateSub: { ...Typography.bodySmall, color: colors.onSurfaceVariant, marginTop: 2 },
 
-  dateCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.primaryContainer,
-    borderRadius: Radius.xl,
-    padding: Spacing.lg,
-    marginBottom: Spacing.lg,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.primary,
-    ...Shadow.sm,
-  },
-  dateIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
-  },
-  dateText: { ...Typography.headlineSmall, color: Colors.onSurface },
-  ratePills: { flexDirection: 'row', marginTop: 6 },
-  ratePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: Radius.full,
-    marginRight: 6,
-  },
-  ratePillGold: { backgroundColor: Colors.goldLight },
-  ratePillText: { ...Typography.labelSmall, color: Colors.primary, marginLeft: 3 },
-  ratePillTextGold: { ...Typography.labelSmall, color: Colors.gold },
+    entryBlock: {
+      backgroundColor: colors.surface,
+      borderRadius: Radius.lg,
+      padding: Spacing.lg,
+      marginBottom: Spacing.md,
+      ...Shadow.sm,
+    },
+    entryBlockHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: Spacing.md,
+    },
+    entryTypeTag: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: Spacing.md,
+      paddingVertical: 5,
+      borderRadius: Radius.full,
+    },
+    entryTypeText: {
+      ...Typography.labelMedium,
+      marginLeft: 5,
+    },
+    entryTypeRate: {
+      ...Typography.bodySmall,
+      color: colors.onSurfaceSubtle,
+    },
+    inputWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceVariant,
+      borderRadius: Radius.md,
+      padding: Spacing.md,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+    },
+    mainInput: {
+      ...Typography.headlineMedium,
+      color: colors.onSurface,
+      flex: 1,
+      padding: 0,
+      includeFontPadding: false,
+    },
+    unitLabel: {
+      ...Typography.bodyMedium,
+      color: colors.onSurfaceSubtle,
+      marginRight: Spacing.sm,
+    },
+    miniEarning: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: Spacing.sm,
+      paddingHorizontal: 2,
+    },
+    miniEarningText: {
+      ...Typography.bodySmall,
+      marginLeft: 4,
+      fontWeight: '600',
+    },
 
-  // Section boxes
-  sectionBox: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
-    ...Shadow.sm,
-  },
-  sectionBoxGold: {
-    borderWidth: 1.5,
-    borderColor: Colors.goldBright + '50',
-    backgroundColor: '#FFFBEB',
-  },
-  sectionBoxHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  sectionBoxIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.sm,
-  },
-  caratIcon: { fontSize: 13, color: Colors.gold },
-  sectionBoxTitle: { ...Typography.labelLarge, color: Colors.onSurfaceVariant, flex: 1 },
-  sectionBadge: {
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    borderRadius: Radius.full,
-  },
-  sectionBadgeGold: { backgroundColor: Colors.goldLight },
-  sectionBadgeText: { ...Typography.labelSmall, color: Colors.primary, fontWeight: '700' },
+    earningsCard: {
+      backgroundColor: colors.primaryContainer,
+      borderRadius: Radius.lg,
+      padding: Spacing.lg,
+      borderWidth: 1.5,
+      borderColor: colors.primaryLight,
+      marginBottom: Spacing.lg,
+    },
+    earningsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    earningsLabel: { ...Typography.labelLarge },
+    earningsLine: { ...Typography.bodySmall, color: colors.onSurfaceVariant, lineHeight: 18 },
+    earningsAmount: { ...Typography.displayMedium },
 
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surfaceVariant,
-    borderRadius: Radius.lg,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-  },
-  inputWrapperGold: {
-    borderColor: Colors.goldBright + '60',
-    backgroundColor: '#FEFCE8',
-  },
-  mainInput: {
-    ...Typography.displayMedium,
-    color: Colors.onSurface,
-    flex: 1,
-    padding: 0,
-    includeFontPadding: false,
-  },
-  inputUnit: {
-    ...Typography.labelMedium,
-    color: Colors.onSurfaceSubtle,
-    marginLeft: Spacing.sm,
-    marginRight: Spacing.xs,
-  },
-  miniEarningsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.sm,
-    paddingTop: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  miniFormula: { ...Typography.bodySmall, color: Colors.onSurfaceVariant },
-  miniAmount: { ...Typography.headlineSmall, color: Colors.primary },
-  caratHint: {
-    ...Typography.bodySmall,
-    color: Colors.goldMid,
-    marginTop: Spacing.sm,
-    fontStyle: 'italic',
-  },
+    section: { marginBottom: Spacing.lg },
+    label: { ...Typography.labelLarge, paddingLeft: 4, marginBottom: Spacing.sm },
+    notesWrapper: { alignItems: 'flex-start', minHeight: 100 },
+    notesInput: { ...Typography.bodyLarge, lineHeight: 24, minHeight: 80 },
 
-  notesWrapper: { alignItems: 'flex-start', minHeight: 100 },
-  notesInput: {
-    ...Typography.bodyLarge,
-    lineHeight: 24,
-    minHeight: 80,
-    fontSize: 15,
-  },
-
-  // Total card
-  totalCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.gradientPrimaryStart,
-    borderRadius: Radius.xl,
-    padding: Spacing.xl,
-    marginBottom: Spacing.md,
-    ...Shadow.lg,
-  },
-  totalLeft: { flex: 1, marginRight: Spacing.md },
-  totalLabel: { ...Typography.labelLarge, color: 'rgba(255,255,255,0.8)' },
-  totalBreakdown: { ...Typography.bodySmall, color: 'rgba(255,255,255,0.6)', marginTop: 3 },
-  totalAmount: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: Colors.onPrimary,
-    letterSpacing: -0.8,
-  },
-
-  primaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.xl,
-    padding: Spacing.lg,
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.md,
-    elevation: 4,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-  },
-  primaryBtnText: { ...Typography.headlineSmall, color: Colors.onPrimary, marginLeft: Spacing.sm },
-  deleteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.lg,
-    borderRadius: Radius.xl,
-    borderWidth: 1.5,
-    borderColor: Colors.error + '60',
-    backgroundColor: Colors.errorLight,
-  },
-  deleteBtnText: { ...Typography.labelLarge, color: Colors.error, marginLeft: Spacing.sm },
-});
+    primaryBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: Radius.lg,
+      padding: Spacing.lg,
+      marginTop: Spacing.sm,
+      elevation: 4,
+    },
+    primaryBtnText: { ...Typography.headlineSmall, marginLeft: Spacing.sm },
+    deleteBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: Spacing.lg,
+      borderRadius: Radius.lg,
+      borderWidth: 1.5,
+      marginTop: Spacing.md,
+    },
+    deleteBtnText: { ...Typography.labelLarge, marginLeft: Spacing.sm },
+  });
+}

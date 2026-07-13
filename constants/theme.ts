@@ -50,14 +50,6 @@ export const Colors = {
   selected: '#1E3A8A',
   markedDot: '#059669',
 
-  // Gold / Carat
-  gold: '#B45309',
-  goldMid: '#D97706',
-  goldLight: '#FEF3C7',
-  goldBright: '#F59E0B',
-  goldGradientStart: '#92400E',
-  goldGradientEnd: '#F59E0B',
-
   // Misc
   cardShadow: 'rgba(15, 23, 42, 0.08)',
   overlay: 'rgba(0, 0, 0, 0.52)',

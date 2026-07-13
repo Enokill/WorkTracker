@@ -5,8 +5,10 @@ import {
   StyleSheet,
   Pressable,
   Modal,
+  Animated,
 } from 'react-native';
-import { Colors, Typography, Spacing, Radius, Shadow } from '@/constants/theme';
+import { Typography, Spacing, Radius, Shadow } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useApp } from '@/hooks/useApp';
 import { formatDate } from '@/services/storage';
 
@@ -30,24 +32,25 @@ interface LongPressMenuProps {
   onClose: () => void;
   onMakeRed: () => void;
   onReset: () => void;
+  colors: ReturnType<typeof useTheme>['colors'];
 }
 
-function LongPressMenu({ visible, date, onClose, onMakeRed, onReset }: LongPressMenuProps) {
+function LongPressMenu({ visible, date, onClose, onMakeRed, onReset, colors }: LongPressMenuProps) {
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <View style={styles.contextMenu}>
-          <Text style={styles.contextTitle}>{date}</Text>
+      <Pressable style={[styles.overlay, { backgroundColor: colors.overlay }]} onPress={onClose}>
+        <View style={[styles.contextMenu, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.contextTitle, { color: colors.onSurfaceVariant, borderBottomColor: colors.border }]}>{date}</Text>
           <Pressable style={styles.contextItem} onPress={onMakeRed}>
-            <Text style={[styles.contextItemText, { color: Colors.error }]}>Make Date Red</Text>
+            <Text style={[styles.contextItemText, { color: colors.error }]}>Make Date Red</Text>
           </Pressable>
-          <View style={styles.contextDivider} />
+          <View style={[styles.contextDivider, { backgroundColor: colors.border }]} />
           <Pressable style={styles.contextItem} onPress={onReset}>
-            <Text style={styles.contextItemText}>Reset to Default</Text>
+            <Text style={[styles.contextItemText, { color: colors.onSurface }]}>Reset to Default</Text>
           </Pressable>
-          <View style={styles.contextDivider} />
+          <View style={[styles.contextDivider, { backgroundColor: colors.border }]} />
           <Pressable style={styles.contextItem} onPress={onClose}>
-            <Text style={[styles.contextItemText, { color: Colors.onSurfaceVariant }]}>Cancel</Text>
+            <Text style={[styles.contextItemText, { color: colors.onSurfaceVariant }]}>Cancel</Text>
           </Pressable>
         </View>
       </Pressable>
@@ -61,22 +64,22 @@ interface MonthPickerProps {
   month: number;
   onClose: () => void;
   onSelect: (year: number, month: number) => void;
+  colors: ReturnType<typeof useTheme>['colors'];
 }
 
-function MonthPicker({ visible, year, month, onClose, onSelect }: MonthPickerProps) {
+function MonthPicker({ visible, year, month, onClose, onSelect, colors }: MonthPickerProps) {
   const [pickerYear, setPickerYear] = useState(year);
-
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.pickerContainer} onPress={() => {}}>
+      <Pressable style={[styles.overlay, { backgroundColor: colors.overlay }]} onPress={onClose}>
+        <Pressable style={[styles.pickerContainer, { backgroundColor: colors.surface }]} onPress={() => {}}>
           <View style={styles.pickerHeader}>
             <Pressable onPress={() => setPickerYear(y => y - 1)} style={styles.pickerArrow}>
-              <Text style={styles.pickerArrowText}>‹</Text>
+              <Text style={[styles.pickerArrowText, { color: colors.primary }]}>‹</Text>
             </Pressable>
-            <Text style={styles.pickerYear}>{pickerYear}</Text>
+            <Text style={[styles.pickerYear, { color: colors.onSurface }]}>{pickerYear}</Text>
             <Pressable onPress={() => setPickerYear(y => y + 1)} style={styles.pickerArrow}>
-              <Text style={styles.pickerArrowText}>›</Text>
+              <Text style={[styles.pickerArrowText, { color: colors.primary }]}>›</Text>
             </Pressable>
           </View>
           <View style={styles.pickerMonths}>
@@ -86,10 +89,18 @@ function MonthPicker({ visible, year, month, onClose, onSelect }: MonthPickerPro
               return (
                 <Pressable
                   key={m}
-                  style={[styles.pickerMonth, isSelected && styles.pickerMonthSelected]}
+                  style={[
+                    styles.pickerMonth,
+                    { backgroundColor: colors.surfaceVariant },
+                    isSelected && { backgroundColor: colors.primary },
+                  ]}
                   onPress={() => { onSelect(pickerYear, m); onClose(); }}
                 >
-                  <Text style={[styles.pickerMonthText, isSelected && styles.pickerMonthTextSelected]}>
+                  <Text style={[
+                    styles.pickerMonthText,
+                    { color: colors.onSurface },
+                    isSelected && { color: colors.onPrimary },
+                  ]}>
                     {name.slice(0, 3)}
                   </Text>
                 </Pressable>
@@ -102,16 +113,60 @@ function MonthPicker({ visible, year, month, onClose, onSelect }: MonthPickerPro
   );
 }
 
+function DayCell({
+  day, dateStr, isToday, isSelected, isSunday, isRed, hasEntry, hasCarats, onPress, onPressIn, onPressOut, colors,
+}: {
+  day: number; dateStr: string; isToday: boolean; isSelected: boolean; isSunday: boolean;
+  isRed: boolean; hasEntry: boolean; hasCarats: boolean; onPress: () => void;
+  onPressIn: () => void; onPressOut: () => void; colors: ReturnType<typeof useTheme>['colors'];
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scale, { toValue: 0.88, useNativeDriver: true, speed: 40 }).start();
+    onPressIn();
+  };
+  const handlePressOut = () => {
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30 }).start();
+    onPressOut();
+  };
+
+  let dayTextColor = colors.onSurface;
+  if (isRed) dayTextColor = colors.error;
+  if (isSelected) dayTextColor = colors.onPrimary;
+  else if (isToday) dayTextColor = colors.primary;
+
+  return (
+    <Pressable style={styles.dayCell} onPress={onPress} onPressIn={handlePressIn} onPressOut={handlePressOut}>
+      <Animated.View style={[
+        styles.dayInner,
+        isToday && !isSelected && { backgroundColor: colors.primaryLight, borderWidth: 2, borderColor: colors.primary },
+        isSelected && { backgroundColor: colors.primary, elevation: 4, shadowColor: colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 6 },
+        { transform: [{ scale }] },
+      ]}>
+        <Text style={[styles.dayNumber, { color: dayTextColor, fontWeight: isSelected || isToday ? '700' : '400' }]}>
+          {day}
+        </Text>
+        {/* Dot row */}
+        <View style={styles.dotRow}>
+          {hasEntry ? (
+            <View style={[styles.dot, { backgroundColor: isSelected ? colors.onPrimary : colors.accent }]} />
+          ) : null}
+          {hasCarats ? (
+            <View style={[styles.dot, { backgroundColor: isSelected ? colors.onPrimary : colors.accentMid, marginLeft: 2 }]} />
+          ) : null}
+          {!hasEntry && !hasCarats ? <View style={styles.dotPlaceholder} /> : null}
+        </View>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export default function MonthCalendar() {
+  const { colors } = useTheme();
   const {
-    currentYear,
-    currentMonth,
-    selectedDate,
-    setSelectedDate,
-    setCurrentMonth,
-    entries,
-    dateColors,
-    setDateColor,
+    currentYear, currentMonth, selectedDate,
+    setSelectedDate, setCurrentMonth, entries, dateColors, setDateColor,
   } = useApp();
 
   const [longPressDate, setLongPressDate] = useState<string | null>(null);
@@ -119,21 +174,18 @@ export default function MonthCalendar() {
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const today = formatDate(new Date());
-
   const daysInMonth = getDaysInMonth(currentYear, currentMonth);
   const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
-  const entryDates = new Set(entries.map(e => e.date));
+  const entryMap = new Map(entries.map(e => [e.date, e]));
 
   const goToPrev = () => {
     if (currentMonth === 1) setCurrentMonth(currentYear - 1, 12);
     else setCurrentMonth(currentYear, currentMonth - 1);
   };
-
   const goToNext = () => {
     if (currentMonth === 12) setCurrentMonth(currentYear + 1, 1);
     else setCurrentMonth(currentYear, currentMonth + 1);
   };
-
   const goToToday = () => {
     const d = new Date();
     setCurrentMonth(d.getFullYear(), d.getMonth() + 1);
@@ -141,27 +193,16 @@ export default function MonthCalendar() {
   };
 
   const handlePressIn = (dateStr: string) => {
-    longPressTimer.current = setTimeout(() => {
-      setLongPressDate(dateStr);
-    }, 600);
+    longPressTimer.current = setTimeout(() => setLongPressDate(dateStr), 600);
   };
-
   const handlePressOut = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
   };
-
   const handleDayPress = (dateStr: string) => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
     setSelectedDate(dateStr);
   };
 
-  // Build calendar grid
   const cells: Array<{ day: number; dateStr: string } | null> = [];
   for (let i = 0; i < firstDay; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) {
@@ -171,21 +212,17 @@ export default function MonthCalendar() {
   while (cells.length % 7 !== 0) cells.push(null);
 
   const weeks: Array<Array<{ day: number; dateStr: string } | null>> = [];
-  for (let i = 0; i < cells.length; i += 7) {
-    weeks.push(cells.slice(i, i + 7));
-  }
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.surface }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.headerBar, { backgroundColor: colors.gradientPrimaryStart }]}>
         <Pressable onPress={goToPrev} style={styles.navBtn} hitSlop={8}>
           <Text style={styles.navBtnText}>‹</Text>
         </Pressable>
         <Pressable onPress={() => setShowPicker(true)} style={styles.monthTitle}>
-          <Text style={styles.monthTitleText}>
-            {MONTH_NAMES[currentMonth - 1]} {currentYear}
-          </Text>
+          <Text style={styles.monthTitleText}>{MONTH_NAMES[currentMonth - 1]} {currentYear}</Text>
         </Pressable>
         <Pressable onPress={goToNext} style={styles.navBtn} hitSlop={8}>
           <Text style={styles.navBtnText}>›</Text>
@@ -196,82 +233,76 @@ export default function MonthCalendar() {
       </View>
 
       {/* Day names */}
-      <View style={styles.dayNamesRow}>
+      <View style={[styles.dayNamesRow, { backgroundColor: colors.primaryLight }]}>
         {DAY_NAMES.map((d, i) => (
-          <Text
-            key={d}
-            style={[styles.dayName, i === 0 && { color: Colors.error }]}
-          >
-            {d}
-          </Text>
+          <Text key={d} style={[styles.dayName, { color: i === 0 ? colors.error : colors.primary }]}>{d}</Text>
         ))}
       </View>
 
       {/* Weeks */}
-      {weeks.map((week, wi) => (
-        <View key={wi} style={styles.weekRow}>
-          {week.map((cell, ci) => {
-            if (!cell) return <View key={ci} style={styles.dayCell} />;
-            const { day, dateStr } = cell;
-            const isToday = dateStr === today;
-            const isSelected = dateStr === selectedDate;
-            const isSunday = ci === 0;
-            const hasEntry = entryDates.has(dateStr);
-            const customColor = dateColors[dateStr];
-            const isRed = customColor === 'red' || (isSunday && !customColor);
+      <View style={styles.gridArea}>
+        {weeks.map((week, wi) => (
+          <View key={wi} style={styles.weekRow}>
+            {week.map((cell, ci) => {
+              if (!cell) return <View key={ci} style={styles.dayCell} />;
+              const { day, dateStr } = cell;
+              const entry = entryMap.get(dateStr);
+              const isSunday = ci === 0;
+              const customColor = dateColors[dateStr];
+              const isRed = customColor === 'red' || (isSunday && !customColor);
+              return (
+                <DayCell
+                  key={dateStr}
+                  day={day}
+                  dateStr={dateStr}
+                  isToday={dateStr === today}
+                  isSelected={dateStr === selectedDate}
+                  isSunday={isSunday}
+                  isRed={isRed}
+                  hasEntry={!!entry && entry.workCount > 0}
+                  hasCarats={!!(entry?.caratWeight && entry.caratWeight > 0)}
+                  onPress={() => handleDayPress(dateStr)}
+                  onPressIn={() => handlePressIn(dateStr)}
+                  onPressOut={handlePressOut}
+                  colors={colors}
+                />
+              );
+            })}
+          </View>
+        ))}
+      </View>
 
-            let dayTextColor = Colors.onSurface;
-            if (isRed) dayTextColor = Colors.error;
-            if (isSelected || isToday) dayTextColor = Colors.onPrimary;
-
-            return (
-              <Pressable
-                key={dateStr}
-                style={styles.dayCell}
-                onPress={() => handleDayPress(dateStr)}
-                onPressIn={() => handlePressIn(dateStr)}
-                onPressOut={handlePressOut}
-              >
-                <View style={[
-                  styles.dayInner,
-                  isToday && !isSelected && styles.todayInner,
-                  isSelected && styles.selectedInner,
-                ]}>
-                  <Text style={[styles.dayNumber, { color: dayTextColor }, isSelected && styles.dayNumberSelected]}>
-                    {day}
-                  </Text>
-                  {hasEntry ? (
-                    <View style={[styles.dot, isSelected && { backgroundColor: Colors.onPrimary }]} />
-                  ) : <View style={styles.dotPlaceholder} />}
-                </View>
-              </Pressable>
-            );
-          })}
+      {/* Legend strip */}
+      <View style={[styles.legendStrip, { borderTopColor: colors.border }]}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: colors.accent }]} />
+          <Text style={[styles.legendText, { color: colors.onSurfaceSubtle }]}>Units</Text>
         </View>
-      ))}
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: colors.accentMid }]} />
+          <Text style={[styles.legendText, { color: colors.onSurfaceSubtle }]}>Carats</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: colors.primary, borderWidth: 2, borderColor: colors.primary }]} />
+          <Text style={[styles.legendText, { color: colors.onSurfaceSubtle }]}>Today</Text>
+        </View>
+      </View>
 
-      {/* Long press menu */}
       <LongPressMenu
         visible={!!longPressDate}
         date={longPressDate || ''}
         onClose={() => setLongPressDate(null)}
-        onMakeRed={() => {
-          if (longPressDate) setDateColor(longPressDate, 'red');
-          setLongPressDate(null);
-        }}
-        onReset={() => {
-          if (longPressDate) setDateColor(longPressDate, 'default');
-          setLongPressDate(null);
-        }}
+        onMakeRed={() => { if (longPressDate) setDateColor(longPressDate, 'red'); setLongPressDate(null); }}
+        onReset={() => { if (longPressDate) setDateColor(longPressDate, 'default'); setLongPressDate(null); }}
+        colors={colors}
       />
-
-      {/* Month picker */}
       <MonthPicker
         visible={showPicker}
         year={currentYear}
         month={currentMonth}
         onClose={() => setShowPicker(false)}
         onSelect={(y, m) => setCurrentMonth(y, m)}
+        colors={colors}
       />
     </View>
   );
@@ -279,121 +310,85 @@ export default function MonthCalendar() {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.surface,
     borderRadius: Radius.xl,
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
+    overflow: 'hidden',
     ...Shadow.md,
   },
-  header: {
+  headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
-    paddingHorizontal: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
   },
   navBtn: {
-    padding: Spacing.xs,
-    borderRadius: Radius.full,
     width: 36,
     height: 36,
+    borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
-  navBtnText: {
-    fontSize: 22,
-    color: Colors.primary,
-    lineHeight: 26,
-    fontWeight: '600',
-  },
-  monthTitle: {
-    flex: 1,
-    marginHorizontal: Spacing.sm,
-  },
-  monthTitleText: {
-    ...Typography.headlineMedium,
-    color: Colors.onSurface,
-  },
+  navBtnText: { fontSize: 22, color: '#fff', lineHeight: 26, fontWeight: '700' },
+  monthTitle: { flex: 1, marginHorizontal: Spacing.sm },
+  monthTitleText: { ...Typography.headlineMedium, color: '#fff' },
   todayBtn: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
     borderRadius: Radius.full,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
-  todayBtnText: {
-    ...Typography.labelMedium,
-    color: Colors.primary,
-  },
+  todayBtnText: { ...Typography.labelMedium, color: '#fff' },
+
   dayNamesRow: {
     flexDirection: 'row',
-    marginBottom: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.xs,
   },
   dayName: {
     flex: 1,
     textAlign: 'center',
     ...Typography.labelSmall,
-    color: Colors.onSurfaceVariant,
-    paddingVertical: Spacing.xs,
+    fontWeight: '700',
+    paddingVertical: 4,
   },
-  weekRow: {
-    flexDirection: 'row',
+
+  gridArea: {
+    paddingHorizontal: Spacing.xs,
+    paddingTop: Spacing.xs,
+    paddingBottom: 2,
   },
+  weekRow: { flexDirection: 'row' },
   dayCell: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 2,
+    paddingVertical: 3,
   },
   dayInner: {
     width: 38,
-    height: 42,
-    borderRadius: Radius.lg,
+    height: 44,
+    borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  todayInner: {
-    backgroundColor: Colors.primaryLight,
-    borderWidth: 2,
-    borderColor: Colors.primary,
-    borderRadius: Radius.lg,
-  },
-  selectedInner: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.lg,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.45,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  dayNumber: {
-    ...Typography.bodyMedium,
-    fontWeight: '500',
-  },
-  dayNumberSelected: {
-    fontWeight: '800',
-    fontSize: 15,
-  },
-  dot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: Colors.accent,
-    marginTop: 2,
-  },
-  dotPlaceholder: {
-    width: 5,
-    height: 5,
-    marginTop: 2,
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: Colors.overlay,
-    justifyContent: 'center',
+  dayNumber: { ...Typography.bodyMedium },
+  dotRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  dot: { width: 5, height: 5, borderRadius: 3 },
+  dotPlaceholder: { width: 5, height: 5 },
+
+  legendStrip: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderTopWidth: 1,
   },
+  legendItem: { flexDirection: 'row', alignItems: 'center', marginRight: Spacing.xl },
+  legendDot: { width: 8, height: 8, borderRadius: 4, marginRight: 5 },
+  legendText: { ...Typography.labelSmall, fontSize: 10 },
+
+  overlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   contextMenu: {
-    backgroundColor: Colors.surface,
     borderRadius: Radius.xl,
     width: 240,
     overflow: 'hidden',
@@ -401,26 +396,14 @@ const styles = StyleSheet.create({
   },
   contextTitle: {
     ...Typography.labelMedium,
-    color: Colors.onSurfaceVariant,
     textAlign: 'center',
     padding: Spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
-  contextItem: {
-    padding: Spacing.lg,
-    alignItems: 'center',
-  },
-  contextItemText: {
-    ...Typography.bodyLarge,
-    color: Colors.onSurface,
-  },
-  contextDivider: {
-    height: 1,
-    backgroundColor: Colors.border,
-  },
+  contextItem: { padding: Spacing.lg, alignItems: 'center' },
+  contextItemText: { ...Typography.bodyLarge },
+  contextDivider: { height: 1 },
   pickerContainer: {
-    backgroundColor: Colors.surface,
     borderRadius: Radius.xl,
     width: 300,
     padding: Spacing.lg,
@@ -432,39 +415,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: Spacing.lg,
   },
-  pickerArrow: {
-    padding: Spacing.sm,
-  },
-  pickerArrowText: {
-    fontSize: 28,
-    color: Colors.primary,
-    lineHeight: 32,
-  },
-  pickerYear: {
-    ...Typography.headlineLarge,
-    color: Colors.onSurface,
-  },
-  pickerMonths: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -Spacing.xs,
-  },
+  pickerArrow: { padding: Spacing.sm },
+  pickerArrowText: { fontSize: 28, lineHeight: 32 },
+  pickerYear: { ...Typography.headlineLarge },
+  pickerMonths: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -Spacing.xs },
   pickerMonth: {
     width: '30%',
     margin: Spacing.xs,
     paddingVertical: Spacing.md,
     borderRadius: Radius.md,
     alignItems: 'center',
-    backgroundColor: Colors.surfaceVariant,
   },
-  pickerMonthSelected: {
-    backgroundColor: Colors.primary,
-  },
-  pickerMonthText: {
-    ...Typography.labelLarge,
-    color: Colors.onSurface,
-  },
-  pickerMonthTextSelected: {
-    color: Colors.onPrimary,
-  },
+  pickerMonthText: { ...Typography.labelLarge },
 });
