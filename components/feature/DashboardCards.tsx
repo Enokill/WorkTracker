@@ -25,11 +25,14 @@ interface EarningsCardProps {
   sublabel: string;
   count: number;
   amount: number;
+  caratCount?: number;
+  caratAmount?: number;
   iconName: string;
   gradientColors: readonly [string, string];
 }
 
-function EarningsCard({ label, sublabel, count, amount, iconName, gradientColors }: EarningsCardProps) {
+function EarningsCard({ label, sublabel, count, amount, caratCount, caratAmount, iconName, gradientColors }: EarningsCardProps) {
+  const combined = amount + (caratAmount || 0);
   return (
     <LinearGradient
       colors={gradientColors}
@@ -45,22 +48,31 @@ function EarningsCard({ label, sublabel, count, amount, iconName, gradientColors
       </View>
       <Text style={styles.gradientCardCount}>{formatCount(count)}</Text>
       <Text style={styles.gradientCardUnit}>units</Text>
+      {caratCount != null && caratCount > 0 ? (
+        <View style={styles.caratRow}>
+          <Text style={styles.caratDiamond}>◆</Text>
+          <Text style={styles.caratValue}>{caratCount.toFixed(2)} ct</Text>
+        </View>
+      ) : null}
       <View style={styles.gradientDivider} />
       <View style={styles.cardBottomRow}>
         <Text style={styles.gradientSublabel}>{sublabel}</Text>
-        <Text style={styles.gradientCardAmount}>{formatRupee(amount)}</Text>
+        <Text style={styles.gradientCardAmount}>{formatRupee(combined)}</Text>
       </View>
     </LinearGradient>
   );
 }
 
 function SelectedDayCard() {
-  const { selectedDate, getEntryForDate, settings } = useApp();
+  const { selectedDate, getEntryForDate, settings, totalDailyEarnings } = useApp();
   const entry = getEntryForDate(selectedDate);
   const workCount = entry ? entry.workCount : 0;
-  const earnings = workCount * settings.ratePerUnit;
+  const caratWeight = entry ? (entry.weightInCarats || 0) : 0;
+  const earnings = totalDailyEarnings(selectedDate);
   const d = parseDate(selectedDate);
-  const label = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', weekday: 'short' });
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const label = `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]}`;
 
   return (
     <View style={[styles.surfaceCard, { borderLeftColor: Colors.secondary }]}>
@@ -73,6 +85,11 @@ function SelectedDayCard() {
       <Text style={styles.surfaceCardDate}>{label}</Text>
       <Text style={styles.surfaceCardCount}>{formatCount(workCount)}</Text>
       <Text style={styles.surfaceCardUnit}>units</Text>
+      {caratWeight > 0 ? (
+        <View style={styles.caratPill}>
+          <Text style={styles.caratPillText}>◆ {caratWeight.toFixed(2)} ct</Text>
+        </View>
+      ) : null}
       <Text style={[styles.surfaceCardAmount, { color: Colors.secondary }]}>{formatRupee(earnings)}</Text>
     </View>
   );
@@ -134,7 +151,8 @@ function AdvanceSalaryCard() {
 }
 
 function PayableCard() {
-  const { payableIncome, monthEarnings, advanceSalary } = useApp();
+  const { payableIncome, monthEarnings, monthCaratEarnings, advanceSalary } = useApp();
+  const totalMonthEarnings = monthEarnings + monthCaratEarnings;
   const isNegative = payableIncome < 0;
 
   return (
@@ -154,8 +172,13 @@ function PayableCard() {
           <Text style={styles.payableLabel}>Payable Income</Text>
         </View>
         <Text style={styles.payableFormula}>
-          {formatRupee(monthEarnings)} − {formatRupee(advanceSalary)} advance
+          {formatRupee(totalMonthEarnings)} − {formatRupee(advanceSalary)} advance
         </Text>
+        {monthCaratEarnings > 0 ? (
+          <Text style={styles.payableCaratNote}>
+            incl. ◆ {formatRupee(monthCaratEarnings)} carat
+          </Text>
+        ) : null}
       </View>
       <View style={styles.payableRight}>
         <Text style={styles.payableAmount}>{formatRupee(payableIncome)}</Text>
@@ -166,17 +189,19 @@ function PayableCard() {
 }
 
 export default function DashboardCards() {
-  const { weekTotal, monthTotal, weekEarnings, monthEarnings, settings } = useApp();
+  const { weekTotal, monthTotal, weekEarnings, monthEarnings, weekCaratTotal, monthCaratTotal, weekCaratEarnings, monthCaratEarnings, settings } = useApp();
 
   return (
     <View>
-      {/* Row 1: Week + Month gradient cards */}
+      {/* Row 1: Week + Month */}
       <View style={styles.row}>
         <EarningsCard
           label="This Week"
           sublabel="Sun – Sat"
           count={weekTotal}
           amount={weekEarnings}
+          caratCount={weekCaratTotal}
+          caratAmount={weekCaratEarnings}
           iconName="date-range"
           gradientColors={[Colors.primaryMid, '#60A5FA']}
         />
@@ -186,6 +211,8 @@ export default function DashboardCards() {
           sublabel={`₹${settings.ratePerUnit}/unit`}
           count={monthTotal}
           amount={monthEarnings}
+          caratCount={monthCaratTotal}
+          caratAmount={monthCaratEarnings}
           iconName="bar-chart"
           gradientColors={[Colors.accent, Colors.gradientAccentEnd]}
         />
@@ -198,7 +225,7 @@ export default function DashboardCards() {
         <AdvanceSalaryCard />
       </View>
 
-      {/* Row 3: Payable Income (full width) */}
+      {/* Row 3: Payable Income */}
       <PayableCard />
     </View>
   );
@@ -210,7 +237,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
 
-  // Gradient card (Week / Month)
   gradientCard: {
     flex: 1,
     borderRadius: Radius.xl,
@@ -245,8 +271,20 @@ const styles = StyleSheet.create({
   gradientCardUnit: {
     ...Typography.labelSmall,
     color: 'rgba(255,255,255,0.65)',
-    marginBottom: Spacing.sm,
+    marginBottom: 4,
   },
+  caratRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
+    alignSelf: 'flex-start',
+    marginBottom: 4,
+  },
+  caratDiamond: { color: Colors.goldBright, fontSize: 10, marginRight: 4 },
+  caratValue: { ...Typography.labelSmall, color: 'rgba(255,255,255,0.9)', fontSize: 10 },
   gradientDivider: {
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -266,7 +304,6 @@ const styles = StyleSheet.create({
     color: Colors.onPrimary,
   },
 
-  // Surface card (Selected Day / Advance)
   surfaceCard: {
     flex: 1,
     backgroundColor: Colors.surface,
@@ -304,6 +341,15 @@ const styles = StyleSheet.create({
     color: Colors.onSurfaceSubtle,
     marginBottom: Spacing.xs,
   },
+  caratPill: {
+    backgroundColor: Colors.goldLight,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+    alignSelf: 'flex-start',
+    marginBottom: 4,
+  },
+  caratPillText: { ...Typography.labelSmall, color: Colors.gold, fontSize: 10 },
   surfaceCardAmount: {
     ...Typography.headlineMedium,
     marginTop: Spacing.xs,
@@ -330,7 +376,6 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
 
-  // Payable card
   payableCard: {
     borderRadius: Radius.xl,
     padding: Spacing.xl,
@@ -366,6 +411,11 @@ const styles = StyleSheet.create({
     ...Typography.bodySmall,
     color: 'rgba(255,255,255,0.65)',
     lineHeight: 18,
+  },
+  payableCaratNote: {
+    ...Typography.labelSmall,
+    color: Colors.goldBright,
+    marginTop: 3,
   },
   payableRight: {
     alignItems: 'flex-end',

@@ -109,7 +109,10 @@ export default function ReportScreen() {
   const daysWorked = monthEntries.length;
   const totalUnits = monthEntries.reduce((s, e) => s + e.workCount, 0);
   const avgUnits = daysWorked > 0 ? Math.round(totalUnits / daysWorked) : 0;
-  const totalEarnings = totalUnits * settings.ratePerUnit;
+  const totalCarats = monthEntries.reduce((s, e) => s + (e.weightInCarats || 0), 0);
+  const unitEarnings = totalUnits * settings.ratePerUnit;
+  const caratEarnings = totalCarats * (settings.ratePerCarat || 0);
+  const totalEarnings = unitEarnings + caratEarnings;
 
   const bestBar = bars.find(b => b.isBest && b.count > 0);
   const bestDate = bestBar ? parseDate(bestBar.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—';
@@ -163,12 +166,17 @@ export default function ReportScreen() {
 
         {/* Summary earnings banner */}
         <View style={styles.earningsBanner}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.bannerLabel}>Total Earnings</Text>
             <Text style={styles.bannerAmount}>{formatRupee(totalEarnings)}</Text>
             <Text style={styles.bannerSub}>
               {formatCount(totalUnits)} units @ ₹{settings.ratePerUnit.toFixed(2)}/unit
             </Text>
+            {totalCarats > 0 ? (
+              <Text style={[styles.bannerSub, { color: Colors.goldBright, marginTop: 2 }]}>
+                ◆ {totalCarats.toFixed(2)} ct @ ₹{(settings.ratePerCarat || 0).toFixed(0)}/ct
+              </Text>
+            ) : null}
           </View>
           <View style={styles.bannerDivider} />
           <View style={styles.bannerRight}>
@@ -282,8 +290,13 @@ export default function ReportScreen() {
                     </View>
                     <View style={styles.entryRight}>
                       <Text style={styles.entryUnits}>{formatCount(entry.workCount)} units</Text>
+                      {entry.weightInCarats != null && entry.weightInCarats > 0 ? (
+                        <Text style={[styles.entryUnits, { color: Colors.gold }]}>
+                          ◆ {entry.weightInCarats.toFixed(2)} ct
+                        </Text>
+                      ) : null}
                       <Text style={[styles.entryEarnings, isBest && { color: Colors.accent }]}>
-                        {formatRupee(earnings)}
+                        {formatRupee((entry.workCount * settings.ratePerUnit) + ((entry.weightInCarats || 0) * (settings.ratePerCarat || 0)))}
                       </Text>
                     </View>
                     {isBest ? (

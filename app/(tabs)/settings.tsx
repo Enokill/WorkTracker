@@ -60,9 +60,11 @@ export default function SettingsScreen() {
   const { showAlert } = useAlert();
 
   const [rateInput, setRateInput] = useState(settings.ratePerUnit.toString());
+  const [caratRateInput, setCaratRateInput] = useState((settings.ratePerCarat || 500).toString());
   const [usernameInput, setUsernameInput] = useState(settings.username || '');
   const [saving, setSaving] = useState(false);
   const [savingName, setSavingName] = useState(false);
+  const [savingCarat, setSavingCarat] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
@@ -80,6 +82,18 @@ export default function SettingsScreen() {
     await updateSettings({ ...settings, ratePerUnit: parsed });
     setSaving(false);
     showAlert('Rate Updated', `New rate set to \u20b9${parsed.toFixed(2)} per unit.`);
+  };
+
+  const handleSaveCaratRate = async () => {
+    const parsed = parseFloat(caratRateInput);
+    if (isNaN(parsed) || parsed < 0) {
+      showAlert('Invalid Rate', 'Please enter a valid number for the carat rate.');
+      return;
+    }
+    setSavingCarat(true);
+    await updateSettings({ ...settings, ratePerCarat: parsed });
+    setSavingCarat(false);
+    showAlert('Carat Rate Updated', `New carat rate set to \u20b9${parsed.toFixed(0)} per carat.`);
   };
 
   const handleSaveName = async () => {
@@ -239,7 +253,7 @@ export default function SettingsScreen() {
           </View>
 
           {/* Rate */}
-          <SectionHeader title="Work Rate" subtitle="Applied to all earnings calculations" />
+          <SectionHeader title="Work Rate" subtitle="Applied to unit-based earnings" />
           <View style={styles.card}>
             <View style={styles.inputGroup}>
               <View style={styles.inputIconWrap}>
@@ -268,6 +282,41 @@ export default function SettingsScreen() {
             <View style={styles.currentRateBadge}>
               <MaterialIcons name="info-outline" size={13} color={Colors.primary} />
               <Text style={styles.currentRateText}>Current: ₹{settings.ratePerUnit.toFixed(2)} per unit</Text>
+            </View>
+          </View>
+
+          {/* Carat Rate */}
+          <SectionHeader title="Carat Rate" subtitle="Applied to diamond / gemstone weight entries" />
+          <View style={[styles.card, { borderLeftWidth: 4, borderLeftColor: Colors.goldBright }]}>
+            <View style={styles.inputGroup}>
+              <View style={styles.inputIconWrap}>
+                <Text style={[styles.rupeeIcon, { color: Colors.gold }]}>◆</Text>
+              </View>
+              <TextInput
+                style={[styles.inputField, { color: Colors.gold }]}
+                value={caratRateInput}
+                onChangeText={setCaratRateInput}
+                keyboardType="decimal-pad"
+                placeholder="500"
+                placeholderTextColor={Colors.goldLight}
+                returnKeyType="done"
+                onSubmitEditing={handleSaveCaratRate}
+              />
+              <Text style={[styles.perUnitLabel, { color: Colors.goldMid }]}>per carat</Text>
+            </View>
+            <Pressable
+              style={[styles.saveBtn, { backgroundColor: Colors.gold }, savingCarat && { opacity: 0.6 }]}
+              onPress={handleSaveCaratRate}
+              disabled={savingCarat}
+            >
+              <MaterialIcons name="check" size={16} color="#fff" />
+              <Text style={styles.saveBtnText}>{savingCarat ? 'Saving...' : 'Update Carat Rate'}</Text>
+            </Pressable>
+            <View style={[styles.currentRateBadge, { backgroundColor: Colors.goldLight }]}>
+              <Text style={styles.caratRateIcon}>◆</Text>
+              <Text style={[styles.currentRateText, { color: Colors.gold }]}>
+                Current: ₹{(settings.ratePerCarat || 0).toFixed(0)} per carat
+              </Text>
             </View>
           </View>
 
@@ -602,6 +651,11 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
 
+  caratRateIcon: {
+    fontSize: 11,
+    color: Colors.gold,
+    marginRight: 5,
+  },
   // Restore panel
   restorePanel: {
     backgroundColor: Colors.surface,

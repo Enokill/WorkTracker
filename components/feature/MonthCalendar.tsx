@@ -237,7 +237,7 @@ export default function MonthCalendar() {
                   isToday && !isSelected && styles.todayInner,
                   isSelected && styles.selectedInner,
                 ]}>
-                  <Text style={[styles.dayNumber, { color: dayTextColor }]}>
+                  <Text style={[styles.dayNumber, { color: dayTextColor }, isSelected && styles.dayNumberSelected]}>
                     {day}
                   </Text>
                   {hasEntry ? (
@@ -345,23 +345,34 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   dayInner: {
-    width: 36,
-    height: 40,
-    borderRadius: Radius.md,
+    width: 38,
+    height: 42,
+    borderRadius: Radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   todayInner: {
     backgroundColor: Colors.primaryLight,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: Colors.primary,
+    borderRadius: Radius.lg,
   },
   selectedInner: {
     backgroundColor: Colors.primary,
+    borderRadius: Radius.lg,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    elevation: 6,
   },
   dayNumber: {
     ...Typography.bodyMedium,
     fontWeight: '500',
+  },
+  dayNumberSelected: {
+    fontWeight: '800',
+    fontSize: 15,
   },
   dot: {
     width: 5,

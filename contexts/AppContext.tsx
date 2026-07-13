@@ -52,6 +52,12 @@ interface AppContextType {
   weekEarnings: number;
   monthEarnings: number;
   payableIncome: number;
+  // Carat computed
+  weekCaratTotal: number;
+  monthCaratTotal: number;
+  weekCaratEarnings: number;
+  monthCaratEarnings: number;
+  totalDailyEarnings: (date: string) => number;
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -155,7 +161,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return entries.find(e => e.date === date);
   }, [entries]);
 
-  // Computed values
   const weekDates = getWeekDates();
   const weekTotal = entries
     .filter(e => weekDates.includes(e.date))
@@ -167,9 +172,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     .reduce((sum, e) => sum + e.workCount, 0);
 
   const rate = settings.ratePerUnit;
+  const caratRate = settings.ratePerCarat || 0;
+
+  const weekCaratTotal = entries
+    .filter(e => weekDates.includes(e.date))
+    .reduce((sum, e) => sum + (e.weightInCarats || 0), 0);
+
+  const monthCaratTotal = entries
+    .filter(e => e.date.startsWith(monthPrefix))
+    .reduce((sum, e) => sum + (e.weightInCarats || 0), 0);
+
   const weekEarnings = weekTotal * rate;
   const monthEarnings = monthTotal * rate;
-  const payableIncome = monthEarnings - advanceSalary;
+  const weekCaratEarnings = weekCaratTotal * caratRate;
+  const monthCaratEarnings = monthCaratTotal * caratRate;
+  const payableIncome = (monthEarnings + monthCaratEarnings) - advanceSalary;
+
+  const totalDailyEarnings = (date: string) => {
+    const entry = entries.find(e => e.date === date);
+    if (!entry) return 0;
+    return entry.workCount * rate + (entry.weightInCarats || 0) * caratRate;
+  };
 
   return (
     <AppContext.Provider value={{
@@ -197,6 +220,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       weekEarnings,
       monthEarnings,
       payableIncome,
+      weekCaratTotal,
+      monthCaratTotal,
+      weekCaratEarnings,
+      monthCaratEarnings,
+      totalDailyEarnings,
     }}>
       {children}
     </AppContext.Provider>

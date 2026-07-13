@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export interface WorkEntry {
   date: string; // YYYY-MM-DD
   workCount: number;
+  weightInCarats?: number; // optional carat weight
   notes: string;
   createdAt: string;
   updatedAt: string;
@@ -10,6 +11,7 @@ export interface WorkEntry {
 
 export interface AppSettings {
   ratePerUnit: number;
+  ratePerCarat?: number; // rate per carat weight
   username?: string;
 }
 
@@ -69,9 +71,10 @@ export async function getEntry(date: string): Promise<WorkEntry | null> {
 export async function getSettings(): Promise<AppSettings> {
   try {
     const raw = await AsyncStorage.getItem(KEYS.SETTINGS);
-    return raw ? JSON.parse(raw) : { ratePerUnit: 2.75 };
+    const parsed = raw ? JSON.parse(raw) : {};
+    return { ratePerUnit: 2.75, ratePerCarat: 500, ...parsed };
   } catch {
-    return { ratePerUnit: 2.75 };
+    return { ratePerUnit: 2.75, ratePerCarat: 500 };
   }
 }
 

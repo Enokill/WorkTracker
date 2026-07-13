@@ -37,14 +37,18 @@ function getInitials(name: string): string {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { selectedDate, getEntryForDate, settings } = useApp();
+  const { selectedDate, getEntryForDate, settings, totalDailyEarnings } = useApp();
 
   const entry = getEntryForDate(selectedDate);
   const workCount = entry ? entry.workCount : 0;
+  const caratWeight = entry ? (entry.weightInCarats || 0) : 0;
   const d = parseDate(selectedDate);
-  const dateLabel = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const WDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dateLabel = `${WDAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]}`;
   const username = settings.username || 'Worker';
   const initials = getInitials(username);
+  const dayEarnings = totalDailyEarnings(selectedDate);
 
   const handleAddEntry = () => {
     router.push(`/entry/${selectedDate}`);
@@ -103,12 +107,14 @@ export default function HomeScreen() {
             </View>
             <View>
               <Text style={styles.selectedDateText}>{dateLabel}</Text>
-              <Text style={styles.selectedUnitText}>{workCount} units logged</Text>
+              <Text style={styles.selectedUnitText}>
+                {workCount} units{caratWeight > 0 ? ` · ◆ ${caratWeight.toFixed(2)} ct` : ''}
+              </Text>
             </View>
           </View>
           <View style={styles.selectedRight}>
             <Text style={styles.selectedEarningLabel}>Earned</Text>
-            <Text style={styles.selectedEarningAmt}>{formatRupee(workCount * settings.ratePerUnit)}</Text>
+            <Text style={styles.selectedEarningAmt}>{formatRupee(dayEarnings)}</Text>
           </View>
           <View style={styles.selectedEditBtn}>
             <MaterialIcons name={entry ? 'edit' : 'add'} size={16} color={Colors.onPrimary} />
