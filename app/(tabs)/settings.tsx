@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Share,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,18 +21,26 @@ import { useAlert } from '@/template';
 import { BackupData } from '@/services/storage';
 import { THEMES, ThemeId, ThemeMode } from '@/constants/themes';
 
+// ─── Section Header ───────────────────────────────────────────────────────────
 function SectionHeader({ title, subtitle, colors }: { title: string; subtitle?: string; colors: any }) {
   return (
     <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>{title}</Text>
+      <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>{title.toUpperCase()}</Text>
       {subtitle ? <Text style={[styles.sectionSubtitle, { color: colors.onSurfaceSubtle }]}>{subtitle}</Text> : null}
     </View>
   );
 }
 
+// ─── Setting Row ──────────────────────────────────────────────────────────────
 function SettingRow({ icon, iconColor, iconBg, label, sublabel, onPress, rightElement, colors }: any) {
   return (
-    <Pressable style={({ pressed }) => [styles.settingRow, pressed && { backgroundColor: colors.backgroundAlt }]} onPress={onPress}>
+    <Pressable
+      style={({ pressed }) => [
+        styles.settingRow,
+        pressed && { backgroundColor: colors.backgroundAlt },
+      ]}
+      onPress={onPress}
+    >
       <View style={[styles.settingIconWrap, { backgroundColor: iconBg }]}>
         <MaterialIcons name={icon} size={18} color={iconColor} />
       </View>
@@ -44,20 +53,22 @@ function SettingRow({ icon, iconColor, iconBg, label, sublabel, onPress, rightEl
   );
 }
 
+// ─── Mode Options ─────────────────────────────────────────────────────────────
 const MODE_OPTIONS: { id: ThemeMode; label: string; icon: string }[] = [
   { id: 'auto', label: 'Auto', icon: 'brightness-auto' },
   { id: 'light', label: 'Light', icon: 'light-mode' },
   { id: 'dark', label: 'Dark', icon: 'dark-mode' },
 ];
 
+// ─── Settings Screen ──────────────────────────────────────────────────────────
 export default function SettingsScreen() {
   const { colors, themeId, mode, setThemeId, setMode, themes, isDark } = useTheme();
-  const { settings, updateSettings, weekTotal, entries, createBackup, restoreBackup } = useApp();
+  const { settings, updateSettings, entries, createBackup, restoreBackup } = useApp();
   const { showAlert } = useAlert();
 
   const [rateInput, setRateInput] = useState(settings.ratePerUnit.toString());
   const [caratRateInput, setCaratRateInput] = useState((settings.caratRate ?? 100).toString());
-  const [usernameInput, setUsernameInput] = useState(settings.username || '');
+  const [usernameInput, setUsernameInput] = useState(settings.username ?? '');
   const [saving, setSaving] = useState(false);
   const [savingName, setSavingName] = useState(false);
   const [savingCarat, setSavingCarat] = useState(false);
@@ -66,10 +77,13 @@ export default function SettingsScreen() {
   const [showRestoreInput, setShowRestoreInput] = useState(false);
   const [restoreText, setRestoreText] = useState('');
 
+  const caratEnabled = settings.caratEnabled ?? false;
+
   const totalEntries = entries.length;
   const allTimeWork = entries.reduce((s, e) => s + e.workCount, 0);
-  const allTimeCarats = entries.reduce((s, e) => s + (e.caratWeight ?? 0), 0);
-  const allTimeEarnings = (allTimeWork * settings.ratePerUnit) + (allTimeCarats * (settings.caratRate ?? 100));
+  const allTimeCarats = caratEnabled ? entries.reduce((s, e) => s + (e.caratWeight ?? 0), 0) : 0;
+  const allTimeEarnings = (allTimeWork * settings.ratePerUnit)
+    + (caratEnabled ? allTimeCarats * (settings.caratRate ?? 100) : 0);
 
   const handleSaveRate = async () => {
     const parsed = parseFloat(rateInput);
@@ -98,6 +112,10 @@ export default function SettingsScreen() {
     showAlert('Name Updated', `Welcome, ${name}!`);
   };
 
+  const handleToggleCaratEnabled = async (value: boolean) => {
+    await updateSettings({ ...settings, caratEnabled: value });
+  };
+
   const handleBackup = async () => {
     setBackingUp(true);
     try {
@@ -107,7 +125,9 @@ export default function SettingsScreen() {
         title: 'WorkTracker Backup',
         message: `WorkTracker Backup\nExported: ${new Date(data.exportedAt).toLocaleString('en-IN')}\nEntries: ${data.entries.length}\n\n--- BACKUP DATA ---\n${json}`,
       });
-    } catch { showAlert('Backup Failed', 'Could not export backup data.'); }
+    } catch {
+      showAlert('Backup Failed', 'Could not export backup data.');
+    }
     setBackingUp(false);
   };
 
@@ -141,20 +161,29 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-
-          {/* Profile card */}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* ── Profile Card ── */}
           <LinearGradient
             colors={[colors.gradientPrimaryStart, colors.primaryMid]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={styles.profileCard}
           >
             <View style={styles.profileAvatar}>
-              <Text style={styles.profileInitials}>{(settings.username || 'U')[0].toUpperCase()}</Text>
+              <Text style={styles.profileInitials}>
+                {(settings.username || 'U')[0].toUpperCase()}
+              </Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.profileName}>{settings.username || 'Set your name'}</Text>
-              <Text style={styles.profileSub}>{totalEntries} days · ₹{settings.ratePerUnit.toFixed(2)}/unit · ₹{(settings.caratRate ?? 100).toFixed(0)}/ct</Text>
+              <Text style={styles.profileSub}>
+                {totalEntries} days · ₹{settings.ratePerUnit.toFixed(2)}/unit
+                {caratEnabled ? ` · ₹${(settings.caratRate ?? 100).toFixed(0)}/ct` : ''}
+              </Text>
             </View>
             <View style={styles.profileBadge}>
               <MaterialIcons name="verified" size={14} color="rgba(255,255,255,0.8)" />
@@ -162,32 +191,44 @@ export default function SettingsScreen() {
             </View>
           </LinearGradient>
 
-          {/* Stats strip */}
+          {/* ── Stats Strip ── */}
           <View style={[styles.statsStrip, { backgroundColor: colors.surface }]}>
-            {[
-              { v: totalEntries.toString(), l: 'Days' },
-              { v: allTimeWork.toLocaleString('en-IN'), l: 'Units' },
-              { v: allTimeCarats.toFixed(1) + ' ct', l: 'Carats' },
-              { v: '₹' + (allTimeEarnings >= 1000 ? (allTimeEarnings / 1000).toFixed(1) + 'K' : allTimeEarnings.toFixed(0)), l: 'Earned', accent: true },
-            ].map((s, i, arr) => (
-              <React.Fragment key={s.l}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.onSurface }]}>{totalEntries}</Text>
+              <Text style={[styles.statLabel, { color: colors.onSurfaceSubtle }]}>Days</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.onSurface }]}>{allTimeWork.toLocaleString('en-IN')}</Text>
+              <Text style={[styles.statLabel, { color: colors.onSurfaceSubtle }]}>Units</Text>
+            </View>
+            {caratEnabled ? (
+              <>
+                <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
                 <View style={styles.statItem}>
-                  <Text style={[styles.statValue, { color: s.accent ? colors.accent : colors.onSurface }]}>{s.v}</Text>
-                  <Text style={[styles.statLabel, { color: colors.onSurfaceSubtle }]}>{s.l}</Text>
+                  <Text style={[styles.statValue, { color: colors.onSurface }]}>{allTimeCarats.toFixed(1)} ct</Text>
+                  <Text style={[styles.statLabel, { color: colors.onSurfaceSubtle }]}>Carats</Text>
                 </View>
-                {i < arr.length - 1 ? <View style={[styles.statDivider, { backgroundColor: colors.border }]} /> : null}
-              </React.Fragment>
-            ))}
+              </>
+            ) : null}
+            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.accent }]}>
+                {'₹' + (allTimeEarnings >= 1000
+                  ? (allTimeEarnings / 1000).toFixed(1) + 'K'
+                  : allTimeEarnings.toFixed(0))}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.onSurfaceSubtle }]}>Earned</Text>
+            </View>
           </View>
 
-          {/* ── THEME SECTION ── */}
-          <SectionHeader title="Appearance" subtitle="Choose theme and color mode" colors={colors} />
-
-          {/* Mode selector */}
+          {/* ── APPEARANCE ── */}
+          <SectionHeader title="Appearance" subtitle="Theme and color mode" colors={colors} />
           <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            {/* Mode selector */}
             <Text style={[styles.inputGroupLabel, { color: colors.onSurfaceVariant }]}>Color Mode</Text>
             <View style={styles.modeRow}>
-              {MODE_OPTIONS.map(opt => {
+              {MODE_OPTIONS.map((opt, idx) => {
                 const isActive = mode === opt.id;
                 return (
                   <Pressable
@@ -196,17 +237,20 @@ export default function SettingsScreen() {
                       styles.modeBtn,
                       { backgroundColor: colors.surfaceVariant, borderColor: colors.border },
                       isActive && { backgroundColor: colors.primary, borderColor: colors.primary },
+                      idx < MODE_OPTIONS.length - 1 && { marginRight: Spacing.sm },
                     ]}
                     onPress={() => setMode(opt.id)}
                   >
                     <MaterialIcons name={opt.icon as any} size={18} color={isActive ? colors.onPrimary : colors.onSurfaceVariant} />
-                    <Text style={[styles.modeBtnText, { color: isActive ? colors.onPrimary : colors.onSurfaceVariant }]}>{opt.label}</Text>
+                    <Text style={[styles.modeBtnText, { color: isActive ? colors.onPrimary : colors.onSurfaceVariant }]}>
+                      {opt.label}
+                    </Text>
                   </Pressable>
                 );
               })}
             </View>
 
-            {/* Theme palette grid */}
+            {/* Theme palette */}
             <Text style={[styles.inputGroupLabel, { color: colors.onSurfaceVariant, marginTop: Spacing.lg }]}>Color Theme</Text>
             <View style={styles.themeGrid}>
               {themes.map(theme => {
@@ -236,6 +280,39 @@ export default function SettingsScreen() {
             </View>
           </View>
 
+          {/* ── CARAT FEATURE FLAG ── */}
+          <SectionHeader title="Features" subtitle="Enable or disable app features" colors={colors} />
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <View style={styles.featureRow}>
+              <View style={[styles.featureIconWrap, { backgroundColor: colors.accentLight }]}>
+                <MaterialIcons name="diamond" size={20} color={colors.accent} />
+              </View>
+              <View style={styles.featureTextGroup}>
+                <Text style={[styles.featureLabel, { color: colors.onSurface }]}>Enable Carat Rate</Text>
+                <Text style={[styles.featureSubLabel, { color: colors.onSurfaceSubtle }]}>
+                  {caratEnabled
+                    ? 'Carat weight tracking is ON'
+                    : 'Turn on to track carat weight & earnings'}
+                </Text>
+              </View>
+              <Switch
+                value={caratEnabled}
+                onValueChange={handleToggleCaratEnabled}
+                trackColor={{ false: colors.border, true: colors.accentLight }}
+                thumbColor={caratEnabled ? colors.accent : colors.onSurfaceSubtle}
+                ios_backgroundColor={colors.border}
+              />
+            </View>
+            {caratEnabled ? (
+              <View style={[styles.featureNote, { backgroundColor: colors.accentLight }]}>
+                <MaterialIcons name="info-outline" size={13} color={colors.accent} />
+                <Text style={[styles.featureNoteText, { color: colors.accent }]}>
+                  Carat inputs, charts, and reports are now visible. Turn OFF to hide — stored data is preserved.
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
           {/* ── PROFILE ── */}
           <SectionHeader title="Profile" subtitle="Your display name" colors={colors} />
           <View style={[styles.card, { backgroundColor: colors.surface }]}>
@@ -253,9 +330,15 @@ export default function SettingsScreen() {
                 onSubmitEditing={handleSaveName}
               />
             </View>
-            <Pressable style={[styles.saveBtn, { backgroundColor: colors.primary }, savingName && { opacity: 0.6 }]} onPress={handleSaveName} disabled={savingName}>
+            <Pressable
+              style={[styles.saveBtn, { backgroundColor: colors.primary }, savingName && { opacity: 0.6 }]}
+              onPress={handleSaveName}
+              disabled={savingName}
+            >
               <MaterialIcons name="check" size={16} color={colors.onPrimary} />
-              <Text style={[styles.saveBtnText, { color: colors.onPrimary }]}>{savingName ? 'Saving...' : 'Save Name'}</Text>
+              <Text style={[styles.saveBtnText, { color: colors.onPrimary }]}>
+                {savingName ? 'Saving...' : 'Save Name'}
+              </Text>
             </Pressable>
           </View>
 
@@ -276,42 +359,62 @@ export default function SettingsScreen() {
               />
               <Text style={[styles.perUnitLabel, { color: colors.onSurfaceSubtle }]}>per unit</Text>
             </View>
-            <Pressable style={[styles.saveBtn, { backgroundColor: colors.primary }, saving && { opacity: 0.6 }]} onPress={handleSaveRate} disabled={saving}>
+            <Pressable
+              style={[styles.saveBtn, { backgroundColor: colors.primary }, saving && { opacity: 0.6 }]}
+              onPress={handleSaveRate}
+              disabled={saving}
+            >
               <MaterialIcons name="check" size={16} color={colors.onPrimary} />
-              <Text style={[styles.saveBtnText, { color: colors.onPrimary }]}>{saving ? 'Saving...' : 'Update Rate'}</Text>
+              <Text style={[styles.saveBtnText, { color: colors.onPrimary }]}>
+                {saving ? 'Saving...' : 'Update Rate'}
+              </Text>
             </Pressable>
             <View style={[styles.currentRateBadge, { backgroundColor: colors.primaryLight }]}>
               <MaterialIcons name="info-outline" size={13} color={colors.primary} />
-              <Text style={[styles.currentRateText, { color: colors.primary }]}>Current: ₹{settings.ratePerUnit.toFixed(2)}/unit</Text>
+              <Text style={[styles.currentRateText, { color: colors.primary }]}>
+                Current: ₹{settings.ratePerUnit.toFixed(2)}/unit
+              </Text>
             </View>
           </View>
 
-          {/* ── CARAT RATE ── */}
-          <SectionHeader title="Carat Rate" subtitle="₹ per carat weight" colors={colors} />
-          <View style={[styles.card, { backgroundColor: colors.surface }]}>
-            <View style={[styles.inputGroup, { backgroundColor: colors.surfaceVariant, borderColor: colors.borderMedium }]}>
-              <MaterialIcons name="diamond" size={18} color={colors.accent} style={{ marginRight: Spacing.sm }} />
-              <TextInput
-                style={[styles.inputField, { color: colors.onSurface }]}
-                value={caratRateInput}
-                onChangeText={setCaratRateInput}
-                keyboardType="decimal-pad"
-                placeholder="100.00"
-                placeholderTextColor={colors.onSurfaceSubtle}
-                returnKeyType="done"
-                onSubmitEditing={handleSaveCaratRate}
-              />
-              <Text style={[styles.perUnitLabel, { color: colors.onSurfaceSubtle }]}>per carat</Text>
-            </View>
-            <Pressable style={[styles.saveBtn, { backgroundColor: colors.accent }, savingCarat && { opacity: 0.6 }]} onPress={handleSaveCaratRate} disabled={savingCarat}>
-              <MaterialIcons name="check" size={16} color="#fff" />
-              <Text style={[styles.saveBtnText, { color: '#fff' }]}>{savingCarat ? 'Saving...' : 'Update Carat Rate'}</Text>
-            </Pressable>
-            <View style={[styles.currentRateBadge, { backgroundColor: colors.accentLight }]}>
-              <MaterialIcons name="diamond" size={13} color={colors.accent} />
-              <Text style={[styles.currentRateText, { color: colors.accent }]}>Current: ₹{(settings.caratRate ?? 100).toFixed(2)}/carat</Text>
-            </View>
-          </View>
+          {/* ── CARAT RATE (conditional) ── */}
+          {caratEnabled ? (
+            <>
+              <SectionHeader title="Carat Rate" subtitle="₹ per carat weight" colors={colors} />
+              <View style={[styles.card, { backgroundColor: colors.surface }]}>
+                <View style={[styles.inputGroup, { backgroundColor: colors.surfaceVariant, borderColor: colors.borderMedium }]}>
+                  <MaterialIcons name="diamond" size={18} color={colors.accent} style={{ marginRight: Spacing.sm }} />
+                  <TextInput
+                    style={[styles.inputField, { color: colors.onSurface }]}
+                    value={caratRateInput}
+                    onChangeText={setCaratRateInput}
+                    keyboardType="decimal-pad"
+                    placeholder="100.00"
+                    placeholderTextColor={colors.onSurfaceSubtle}
+                    returnKeyType="done"
+                    onSubmitEditing={handleSaveCaratRate}
+                  />
+                  <Text style={[styles.perUnitLabel, { color: colors.onSurfaceSubtle }]}>per carat</Text>
+                </View>
+                <Pressable
+                  style={[styles.saveBtn, { backgroundColor: colors.accent }, savingCarat && { opacity: 0.6 }]}
+                  onPress={handleSaveCaratRate}
+                  disabled={savingCarat}
+                >
+                  <MaterialIcons name="check" size={16} color="#FFFFFF" />
+                  <Text style={[styles.saveBtnText, { color: '#FFFFFF' }]}>
+                    {savingCarat ? 'Saving...' : 'Update Carat Rate'}
+                  </Text>
+                </Pressable>
+                <View style={[styles.currentRateBadge, { backgroundColor: colors.accentLight }]}>
+                  <MaterialIcons name="diamond" size={13} color={colors.accent} />
+                  <Text style={[styles.currentRateText, { color: colors.accent }]}>
+                    Current: ₹{(settings.caratRate ?? 100).toFixed(2)}/carat
+                  </Text>
+                </View>
+              </View>
+            </>
+          ) : null}
 
           {/* ── DATA BACKUP ── */}
           <SectionHeader title="Data Backup" subtitle="Export and restore all work data" colors={colors} />
@@ -322,7 +425,9 @@ export default function SettingsScreen() {
               onPress={handleBackup} colors={colors}
               rightElement={
                 <View style={[styles.actionChip, { backgroundColor: colors.accentLight }]}>
-                  <Text style={[styles.actionChipText, { color: colors.accent }]}>{backingUp ? 'Exporting...' : 'Share'}</Text>
+                  <Text style={[styles.actionChipText, { color: colors.accent }]}>
+                    {backingUp ? 'Exporting...' : 'Share'}
+                  </Text>
                 </View>
               }
             />
@@ -339,6 +444,7 @@ export default function SettingsScreen() {
             />
           </View>
 
+          {/* Restore Panel */}
           {showRestoreInput ? (
             <View style={[styles.restorePanel, { backgroundColor: colors.surface, borderColor: colors.primaryLight }]}>
               <View style={styles.restorePanelHeader}>
@@ -349,38 +455,55 @@ export default function SettingsScreen() {
                 </Pressable>
               </View>
               <TextInput
-                style={[styles.restoreInput, { borderColor: colors.borderMedium, color: colors.onSurface, backgroundColor: colors.surfaceVariant }]}
+                style={[styles.restoreInput, {
+                  borderColor: colors.borderMedium,
+                  color: colors.onSurface,
+                  backgroundColor: colors.surfaceVariant,
+                }]}
                 value={restoreText}
                 onChangeText={setRestoreText}
-                placeholder={'Paste backup JSON here...'}
+                placeholder="Paste backup JSON here..."
                 placeholderTextColor={colors.onSurfaceSubtle}
-                multiline numberOfLines={8}
+                multiline
+                numberOfLines={8}
                 textAlignVertical="top"
                 autoFocus
               />
               <View style={styles.restoreActions}>
-                <Pressable style={[styles.restoreCancelBtn, { borderColor: colors.borderMedium }]} onPress={() => { setShowRestoreInput(false); setRestoreText(''); }}>
+                <Pressable
+                  style={[styles.restoreCancelBtn, { borderColor: colors.borderMedium }]}
+                  onPress={() => { setShowRestoreInput(false); setRestoreText(''); }}
+                >
                   <Text style={[styles.restoreCancelText, { color: colors.onSurfaceVariant }]}>Cancel</Text>
                 </Pressable>
-                <Pressable style={[styles.restoreConfirmBtn, { backgroundColor: colors.primary }, restoring && { opacity: 0.6 }]} onPress={handleConfirmRestore} disabled={restoring}>
+                <Pressable
+                  style={[styles.restoreConfirmBtn, { backgroundColor: colors.primary }, restoring && { opacity: 0.6 }]}
+                  onPress={handleConfirmRestore}
+                  disabled={restoring}
+                >
                   <MaterialIcons name="restore" size={16} color={colors.onPrimary} />
-                  <Text style={[styles.restoreConfirmText, { color: colors.onPrimary }]}>{restoring ? 'Restoring...' : 'Restore Data'}</Text>
+                  <Text style={[styles.restoreConfirmText, { color: colors.onPrimary }]}>
+                    {restoring ? 'Restoring...' : 'Restore Data'}
+                  </Text>
                 </Pressable>
               </View>
-              <Text style={[styles.restoreWarning, { color: colors.warning }]}>This will replace all current data.</Text>
+              <Text style={[styles.restoreWarning, { color: colors.warning }]}>
+                This will replace all current data.
+              </Text>
             </View>
           ) : null}
 
-          {/* About */}
+          {/* ── About ── */}
           <SectionHeader title="About" colors={colors} />
           <View style={[styles.menuCard, { backgroundColor: colors.surface }]}>
             <SettingRow
               icon="work" iconColor={colors.primary} iconBg={colors.primaryLight}
-              label="Daily Work Tracker" sublabel="Version 1.1 · Units + Carats"
+              label="Daily Work Tracker"
+              sublabel={caratEnabled ? 'Version 1.2 · Units + Carats' : 'Version 1.2 · Units tracking'}
               colors={colors}
               rightElement={
                 <View style={[styles.versionBadge, { backgroundColor: colors.primaryLight }]}>
-                  <Text style={[styles.versionText, { color: colors.primary }]}>v1.1</Text>
+                  <Text style={[styles.versionText, { color: colors.primary }]}>v1.2</Text>
                 </View>
               }
             />
@@ -407,15 +530,17 @@ const styles = StyleSheet.create({
     width: 52, height: 52, borderRadius: Radius.full,
     backgroundColor: 'rgba(255,255,255,0.25)',
     borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)',
-    alignItems: 'center', justifyContent: 'center', marginRight: Spacing.lg,
+    alignItems: 'center', justifyContent: 'center',
+    marginRight: Spacing.lg, flexShrink: 0,
   },
-  profileInitials: { ...Typography.headlineLarge, color: '#fff' },
-  profileName: { ...Typography.headlineMedium, color: '#fff', marginBottom: 2 },
+  profileInitials: { ...Typography.headlineLarge, color: '#FFFFFF' },
+  profileName: { ...Typography.headlineMedium, color: '#FFFFFF', marginBottom: 2 },
   profileSub: { ...Typography.bodySmall, color: 'rgba(255,255,255,0.75)' },
   profileBadge: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.full,
+    paddingHorizontal: Spacing.sm, paddingVertical: 4,
+    borderRadius: Radius.full, flexShrink: 0,
   },
   profileBadgeText: { ...Typography.labelSmall, color: 'rgba(255,255,255,0.85)', marginLeft: 3 },
 
@@ -429,29 +554,24 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, marginVertical: 4 },
 
   sectionHeader: { marginBottom: Spacing.sm, marginTop: Spacing.md, paddingLeft: 4 },
-  sectionTitle: { ...Typography.labelLarge, textTransform: 'uppercase', letterSpacing: 0.8 },
+  sectionTitle: { ...Typography.labelLarge, letterSpacing: 0.8 },
   sectionSubtitle: { ...Typography.bodySmall, marginTop: 2 },
 
   card: { borderRadius: Radius.lg, padding: Spacing.lg, marginBottom: Spacing.md, ...Shadow.sm },
 
   inputGroupLabel: { ...Typography.labelMedium, marginBottom: Spacing.sm },
-
-  // Mode buttons
   modeRow: { flexDirection: 'row' },
   modeBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingVertical: Spacing.md, marginRight: Spacing.sm,
-    borderRadius: Radius.md, borderWidth: 1.5,
+    paddingVertical: Spacing.md, borderRadius: Radius.md, borderWidth: 1.5,
   },
   modeBtnText: { ...Typography.labelMedium, marginLeft: 6 },
 
-  // Theme grid
   themeGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -Spacing.xs },
   themeCard: { width: '25%', alignItems: 'center', padding: Spacing.xs, marginBottom: Spacing.sm },
   themePreview: {
     width: 54, height: 54, borderRadius: Radius.lg,
-    alignItems: 'center', justifyContent: 'center',
-    overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   themeAccentDot: { width: 16, height: 6, borderRadius: 3 },
   themeCheck: {
@@ -460,6 +580,22 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   themeName: { ...Typography.labelSmall, textAlign: 'center', marginTop: 5, fontSize: 10 },
+
+  // Feature flag row
+  featureRow: { flexDirection: 'row', alignItems: 'center' },
+  featureIconWrap: {
+    width: 40, height: 40, borderRadius: Radius.md,
+    alignItems: 'center', justifyContent: 'center',
+    marginRight: Spacing.md, flexShrink: 0,
+  },
+  featureTextGroup: { flex: 1, marginRight: Spacing.sm },
+  featureLabel: { ...Typography.labelLarge },
+  featureSubLabel: { ...Typography.bodySmall, marginTop: 2 },
+  featureNote: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    borderRadius: Radius.md, padding: Spacing.md, marginTop: Spacing.md,
+  },
+  featureNoteText: { ...Typography.bodySmall, marginLeft: 6, flex: 1, lineHeight: 17 },
 
   inputGroup: {
     flexDirection: 'row', alignItems: 'center',
@@ -471,7 +607,8 @@ const styles = StyleSheet.create({
   inputIconWrap: { marginRight: Spacing.sm },
   rupeeIcon: { ...Typography.headlineMedium, marginRight: Spacing.sm },
   inputField: { ...Typography.headlineSmall, flex: 1, padding: 0, includeFontPadding: false },
-  perUnitLabel: { ...Typography.bodyMedium, marginLeft: Spacing.xs },
+  perUnitLabel: { ...Typography.bodyMedium, marginLeft: Spacing.xs, flexShrink: 0 },
+
   saveBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     borderRadius: Radius.md, paddingVertical: Spacing.md, ...Shadow.sm,
@@ -487,7 +624,7 @@ const styles = StyleSheet.create({
   settingRow: { flexDirection: 'row', alignItems: 'center', padding: Spacing.lg },
   settingIconWrap: {
     width: 36, height: 36, borderRadius: Radius.md,
-    alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md,
+    alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md, flexShrink: 0,
   },
   settingTextGroup: { flex: 1 },
   settingLabel: { ...Typography.labelLarge },

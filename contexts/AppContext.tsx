@@ -28,10 +28,13 @@ interface AppContextType {
   advanceSalary: number;
   loading: boolean;
 
+  // Feature flags
+  caratEnabled: boolean;
+
   // Selected state
   selectedDate: string;
   currentYear: number;
-  currentMonth: number; // 1-12
+  currentMonth: number; // 1–12
 
   // Actions
   setSelectedDate: (date: string) => void;
@@ -61,7 +64,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const todayStr = formatDate(today);
 
   const [entries, setEntries] = useState<WorkEntry[]>([]);
-  const [settings, setSettings] = useState<AppSettings>({ ratePerUnit: 2.75 });
+  const [settings, setSettings] = useState<AppSettings>({ ratePerUnit: 2.75, caratRate: 100, caratEnabled: false });
   const [dateColors, setDateColors] = useState<CustomDateColor>({});
   const [advanceSalary, setAdvanceSalary] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -70,10 +73,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonthState] = useState(today.getMonth() + 1);
 
-  const setCurrentMonth = (year: number, month: number) => {
+  const setCurrentMonth = useCallback((year: number, month: number) => {
     setCurrentYear(year);
     setCurrentMonthState(month);
-  };
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -104,11 +107,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setEntries(prev => {
       const idx = prev.findIndex(e => e.date === entry.date);
       const updated = [...prev];
-      if (idx >= 0) {
-        updated[idx] = entry;
-      } else {
-        updated.push(entry);
-      }
+      if (idx >= 0) updated[idx] = entry;
+      else updated.push(entry);
       return updated;
     });
   }, []);
@@ -127,11 +127,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await storageSaveDateColor(date, color);
     setDateColors(prev => {
       const next = { ...prev };
-      if (color === 'default') {
-        delete next[date];
-      } else {
-        next[date] = color;
-      }
+      if (color === 'default') delete next[date];
+      else next[date] = color;
       return next;
     });
   }, []);
@@ -155,20 +152,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return entries.find(e => e.date === date);
   }, [entries]);
 
-  // Computed values
+  // ── Computed values ───────────────────────────────────────────────────────
+  const caratEnabled = settings.caratEnabled ?? false;
+  const caratRate = settings.caratRate ?? 100;
+  const rate = settings.ratePerUnit;
+
   const weekDates = getWeekDates();
-  const weekTotal = entries
-    .filter(e => weekDates.includes(e.date))
-    .reduce((sum, e) => sum + e.workCount, 0);
+  const weekEntries = entries.filter(e => weekDates.includes(e.date));
+  const weekTotal = weekEntries.reduce((sum, e) => sum + e.workCount, 0);
+  const weekEarnings = weekTotal * rate
+    + (caratEnabled ? weekEntries.reduce((sum, e) => sum + (e.caratWeight ?? 0), 0) * caratRate : 0);
 
   const monthPrefix = getMonthKey(currentYear, currentMonth);
-  const monthTotal = entries
-    .filter(e => e.date.startsWith(monthPrefix))
-    .reduce((sum, e) => sum + e.workCount, 0);
+  const monthEntries = entries.filter(e => e.date.startsWith(monthPrefix));
+  const monthTotal = monthEntries.reduce((sum, e) => sum + e.workCount, 0);
+  const monthEarnings = monthTotal * rate
+    + (caratEnabled ? monthEntries.reduce((sum, e) => sum + (e.caratWeight ?? 0), 0) * caratRate : 0);
 
-  const rate = settings.ratePerUnit;
-  const weekEarnings = weekTotal * rate;
-  const monthEarnings = monthTotal * rate;
   const payableIncome = monthEarnings - advanceSalary;
 
   return (
@@ -178,6 +178,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       dateColors,
       advanceSalary,
       loading,
+      caratEnabled,
       selectedDate,
       currentYear,
       currentMonth,
