@@ -19,8 +19,6 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
-const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function formatRupee(n: number): string {
   return '₹' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -29,30 +27,10 @@ function formatCount(n: number): string {
   return n.toLocaleString('en-IN');
 }
 
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-interface StatCardProps {
-  icon: string;
-  label: string;
-  value: string;
-  sub: string;
-  accent: string;
-  colors: any;
-}
-function StatCard({ icon, label, value, sub, accent, colors }: StatCardProps) {
-  return (
-    <View style={[styles.statCard, { backgroundColor: colors.surface, borderTopColor: accent }]}>
-      <MaterialIcons name={icon as any} size={20} color={accent} />
-      <Text style={[styles.statLabel, { color: colors.onSurfaceVariant }]}>{label}</Text>
-      <Text style={[styles.statValue, { color: accent }]}>{value}</Text>
-      <Text style={[styles.statSub, { color: colors.onSurfaceSubtle }]}>{sub}</Text>
-    </View>
-  );
-}
-
 export default function ReportScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-  const { entries, settings, selectedDate, setSelectedDate, currentYear, currentMonth, setCurrentMonth, caratEnabled } = useApp();
+  const { entries, settings, selectedDate, setSelectedDate, currentYear, currentMonth, setCurrentMonth } = useApp();
 
   const [reportYear, setReportYear] = useState(currentYear);
   const [reportMonth, setReportMonth] = useState(currentMonth);
@@ -70,11 +48,7 @@ export default function ReportScreen() {
   const monthPrefix = getMonthKey(reportYear, reportMonth);
   const daysInMonth = new Date(reportYear, reportMonth, 0).getDate();
 
-  const monthEntries = useMemo(
-    () => entries.filter(e => e.date.startsWith(monthPrefix)),
-    [entries, monthPrefix]
-  );
-
+  const monthEntries = useMemo(() => entries.filter(e => e.date.startsWith(monthPrefix)), [entries, monthPrefix]);
   const entryMap = useMemo(() => {
     const m: Record<string, number> = {};
     monthEntries.forEach(e => { m[e.date] = e.workCount; });
@@ -86,7 +60,7 @@ export default function ReportScreen() {
     let maxCount = 0;
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${monthPrefix}-${String(d).padStart(2, '0')}`;
-      const count = entryMap[dateStr] ?? 0;
+      const count = entryMap[dateStr] || 0;
       if (count > maxCount) maxCount = count;
       result.push({
         date: dateStr, day: d, count,
@@ -103,22 +77,17 @@ export default function ReportScreen() {
   }, [monthPrefix, daysInMonth, entryMap, today, reportYear, reportMonth]);
 
   const maxCount = Math.max(...bars.map(b => b.count), 0);
-
-  // Aggregated stats
   const daysWorked = monthEntries.length;
   const totalUnits = monthEntries.reduce((s, e) => s + e.workCount, 0);
-  const totalCarats = caratEnabled ? monthEntries.reduce((s, e) => s + (e.caratWeight ?? 0), 0) : 0;
+  const totalCarats = monthEntries.reduce((s, e) => s + (e.caratWeight ?? 0), 0);
   const caratRate = settings.caratRate ?? 100;
   const unitEarnings = totalUnits * settings.ratePerUnit;
-  const caratEarnings = caratEnabled ? totalCarats * caratRate : 0;
+  const caratEarnings = totalCarats * caratRate;
   const totalEarnings = unitEarnings + caratEarnings;
   const avgUnits = daysWorked > 0 ? Math.round(totalUnits / daysWorked) : 0;
-
   const bestBar = bars.find(b => b.isBest && b.count > 0);
-  const bestDate = bestBar
-    ? parseDate(bestBar.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-    : '—';
-  const bestCount = bestBar?.count ?? 0;
+  const bestDate = bestBar ? parseDate(bestBar.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—';
+  const bestCount = bestBar ? bestBar.count : 0;
 
   const handleBarPress = (date: string) => {
     setSelectedDate(date);
@@ -129,13 +98,10 @@ export default function ReportScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { backgroundColor: colors.background }]}>
         <View>
           <Text style={[styles.title, { color: colors.onSurface }]}>Monthly Report</Text>
-          <Text style={[styles.subtitle, { color: colors.onSurfaceSubtle }]}>
-            {caratEnabled ? 'Units & carats breakdown' : 'Work units breakdown'}
-          </Text>
+          <Text style={[styles.subtitle, { color: colors.onSurfaceSubtle }]}>Units & carats breakdown</Text>
         </View>
         <Pressable
           style={[styles.todayBtn, { backgroundColor: colors.primaryLight }]}
@@ -145,12 +111,8 @@ export default function ReportScreen() {
         </Pressable>
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Month Nav */}
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Month nav */}
         <View style={[styles.monthNav, { backgroundColor: colors.surface }]}>
           <Pressable onPress={goPrev} style={[styles.navBtn, { backgroundColor: colors.primaryLight }]} hitSlop={8}>
             <MaterialIcons name="chevron-left" size={24} color={colors.primary} />
@@ -163,7 +125,7 @@ export default function ReportScreen() {
           </Pressable>
         </View>
 
-        {/* Earnings Banner */}
+        {/* Earnings banner */}
         <View style={[styles.earningsBanner, { backgroundColor: colors.primary }]}>
           <View style={{ flex: 1 }}>
             <Text style={styles.bannerLabel}>Total Earnings</Text>
@@ -174,7 +136,7 @@ export default function ReportScreen() {
                   <Text style={styles.bannerChipText}>Units: {formatRupee(unitEarnings)}</Text>
                 </View>
               ) : null}
-              {caratEnabled && totalCarats > 0 ? (
+              {totalCarats > 0 ? (
                 <View style={[styles.bannerChip, { marginLeft: 6 }]}>
                   <MaterialIcons name="diamond" size={10} color="rgba(255,255,255,0.8)" />
                   <Text style={styles.bannerChipText}>{totalCarats.toFixed(2)} ct: {formatRupee(caratEarnings)}</Text>
@@ -186,55 +148,44 @@ export default function ReportScreen() {
           <View style={styles.bannerRight}>
             <Text style={styles.bannerSmallLabel}>Days Worked</Text>
             <Text style={styles.bannerSmallValue}>{daysWorked}</Text>
-            <Text style={styles.bannerSmallLabel}>of {daysInMonth}</Text>
+            <Text style={styles.bannerSmallLabel}>of {daysInMonth} days</Text>
           </View>
         </View>
 
-        {/* Stat Cards Row 1 */}
+        {/* Stat cards */}
         <View style={styles.statRow}>
-          <StatCard
-            icon="bar-chart" label="Total Units"
-            value={formatCount(totalUnits)} sub="this month"
-            accent={colors.primary} colors={colors}
-          />
-          <View style={{ width: Spacing.md }} />
-          <StatCard
-            icon="trending-up" label="Daily Avg"
-            value={avgUnits > 0 ? formatCount(avgUnits) : '—'} sub="units/day"
-            accent={colors.secondary} colors={colors}
-          />
+          {[
+            { icon: 'bar-chart', label: 'Total Units', value: formatCount(totalUnits), sub: 'this month', accent: colors.primary },
+            { icon: 'trending-up', label: 'Daily Avg', value: avgUnits > 0 ? formatCount(avgUnits) : '—', sub: 'units/day', accent: colors.secondary },
+          ].map(s => (
+            <View key={s.label} style={[styles.statCard, { backgroundColor: colors.surface, borderTopColor: s.accent }]}>
+              <MaterialIcons name={s.icon as any} size={20} color={s.accent} />
+              <Text style={[styles.statLabel, { color: colors.onSurfaceVariant }]}>{s.label}</Text>
+              <Text style={[styles.statValue, { color: s.accent }]}>{s.value}</Text>
+              <Text style={[styles.statSub, { color: colors.onSurfaceSubtle }]}>{s.sub}</Text>
+            </View>
+          ))}
+        </View>
+        <View style={styles.statRow}>
+          {[
+            { icon: 'star', label: 'Best Day', value: bestDate, sub: bestCount > 0 ? `${formatCount(bestCount)} units` : 'No entries', accent: colors.accent },
+            { icon: 'diamond', label: 'Month Carats', value: totalCarats > 0 ? totalCarats.toFixed(2) + ' ct' : '—', sub: totalCarats > 0 ? formatRupee(caratEarnings) : 'no carat entries', accent: colors.accentMid },
+          ].map(s => (
+            <View key={s.label} style={[styles.statCard, { backgroundColor: colors.surface, borderTopColor: s.accent }]}>
+              <MaterialIcons name={s.icon as any} size={20} color={s.accent} />
+              <Text style={[styles.statLabel, { color: colors.onSurfaceVariant }]}>{s.label}</Text>
+              <Text style={[styles.statValue, { color: s.accent }]}>{s.value}</Text>
+              <Text style={[styles.statSub, { color: colors.onSurfaceSubtle }]}>{s.sub}</Text>
+            </View>
+          ))}
         </View>
 
-        {/* Stat Cards Row 2 */}
-        <View style={styles.statRow}>
-          <StatCard
-            icon="star" label="Best Day"
-            value={bestDate} sub={bestCount > 0 ? `${formatCount(bestCount)} units` : 'No entries'}
-            accent={colors.accent} colors={colors}
-          />
-          {caratEnabled ? (
-            <>
-              <View style={{ width: Spacing.md }} />
-              <StatCard
-                icon="diamond" label="Month Carats"
-                value={totalCarats > 0 ? totalCarats.toFixed(2) + ' ct' : '—'}
-                sub={totalCarats > 0 ? formatRupee(caratEarnings) : 'no carat entries'}
-                accent={colors.accentMid} colors={colors}
-              />
-            </>
-          ) : null}
-        </View>
-
-        {/* Bar Chart */}
+        {/* Bar chart */}
         <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Daily Work Units</Text>
         <View style={[styles.chartCard, { backgroundColor: colors.surface }]}>
           <View style={styles.yAxisHint}>
-            <Text style={[styles.yAxisLabel, { color: colors.onSurfaceSubtle }]}>
-              {maxCount > 0 ? formatCount(maxCount) : ''}
-            </Text>
-            <Text style={[styles.yAxisLabel, { color: colors.onSurfaceSubtle }]}>
-              {maxCount > 0 ? formatCount(Math.round(maxCount / 2)) : ''}
-            </Text>
+            <Text style={[styles.yAxisLabel, { color: colors.onSurfaceSubtle }]}>{maxCount > 0 ? formatCount(maxCount) : ''}</Text>
+            <Text style={[styles.yAxisLabel, { color: colors.onSurfaceSubtle }]}>{maxCount > 0 ? formatCount(Math.round(maxCount / 2)) : ''}</Text>
             <Text style={[styles.yAxisLabel, { color: colors.onSurfaceSubtle }]}>0</Text>
           </View>
           <View style={{ flex: 1 }}>
@@ -248,7 +199,7 @@ export default function ReportScreen() {
           </View>
         </View>
 
-        {/* Chart Legend */}
+        {/* Legend */}
         <View style={styles.legend}>
           {[
             { color: colors.accent, label: 'Best day' },
@@ -257,28 +208,24 @@ export default function ReportScreen() {
             { color: colors.primaryLight, label: 'Today', border: colors.primary },
           ].map(l => (
             <View key={l.label} style={styles.legendItem}>
-              <View style={[styles.legendDot, {
-                backgroundColor: l.color,
-                borderWidth: l.border ? 1 : 0,
-                borderColor: l.border ?? 'transparent',
-              }]} />
+              <View style={[styles.legendDot, { backgroundColor: l.color, borderWidth: l.border ? 1 : 0, borderColor: l.border }]} />
               <Text style={[styles.legendText, { color: colors.onSurfaceVariant }]}>{l.label}</Text>
             </View>
           ))}
         </View>
 
-        {/* Entry Log */}
+        {/* Entry list */}
         {sortedEntries.length > 0 ? (
           <>
             <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Entry Log</Text>
             <View style={[styles.entryListCard, { backgroundColor: colors.surface }]}>
               {sortedEntries.map((entry, idx) => {
                 const d = parseDate(entry.date);
-                const label = `${DAYS_SHORT[d.getDay()]}, ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
-                const entryEarnings = (entry.workCount * settings.ratePerUnit)
-                  + (caratEnabled ? (entry.caratWeight ?? 0) * caratRate : 0);
+                const DAYS_S = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                const MONTHS_S = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const label = `${DAYS_S[d.getDay()]}, ${d.getDate()} ${MONTHS_S[d.getMonth()]}`;
+                const entryEarnings = (entry.workCount * settings.ratePerUnit) + ((entry.caratWeight ?? 0) * caratRate);
                 const isBest = bestBar?.date === entry.date;
-
                 return (
                   <Pressable
                     key={entry.date}
@@ -290,34 +237,22 @@ export default function ReportScreen() {
                     onPress={() => router.push(`/entry/${entry.date}`)}
                   >
                     <View style={styles.entryLeft}>
-                      <Text style={[styles.entryDate, { color: isBest ? colors.accent : colors.onSurface }]}>
-                        {label}
-                      </Text>
+                      <Text style={[styles.entryDate, { color: isBest ? colors.accent : colors.onSurface }]}>{label}</Text>
                       <View style={styles.entryBadgeRow}>
                         {entry.workCount > 0 ? (
-                          <Text style={[styles.entryUnits, { color: colors.onSurfaceVariant }]}>
-                            {formatCount(entry.workCount)} units
-                          </Text>
+                          <Text style={[styles.entryUnits, { color: colors.onSurfaceVariant }]}>{formatCount(entry.workCount)} units</Text>
                         ) : null}
-                        {caratEnabled && entry.caratWeight && entry.caratWeight > 0 ? (
+                        {entry.caratWeight && entry.caratWeight > 0 ? (
                           <View style={styles.caratBadge}>
                             <MaterialIcons name="diamond" size={10} color={colors.accentMid} />
-                            <Text style={[styles.caratBadgeText, { color: colors.accentMid }]}>
-                              {entry.caratWeight.toFixed(2)} ct
-                            </Text>
+                            <Text style={[styles.caratBadgeText, { color: colors.accentMid }]}>{entry.caratWeight.toFixed(2)} ct</Text>
                           </View>
                         ) : null}
                       </View>
-                      {entry.notes ? (
-                        <Text style={[styles.entryNotes, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-                          {entry.notes}
-                        </Text>
-                      ) : null}
+                      {entry.notes ? <Text style={[styles.entryNotes, { color: colors.onSurfaceVariant }]} numberOfLines={1}>{entry.notes}</Text> : null}
                     </View>
                     <View style={styles.entryRight}>
-                      <Text style={[styles.entryEarnings, { color: isBest ? colors.accent : colors.primary }]}>
-                        {formatRupee(entryEarnings)}
-                      </Text>
+                      <Text style={[styles.entryEarnings, { color: isBest ? colors.accent : colors.primary }]}>{formatRupee(entryEarnings)}</Text>
                     </View>
                     {isBest ? (
                       <View style={[styles.bestBadge, { backgroundColor: colors.accent }]}>
@@ -331,16 +266,11 @@ export default function ReportScreen() {
           </>
         ) : null}
 
-        {/* Empty State */}
         {monthEntries.length === 0 ? (
           <View style={styles.emptyState}>
-            <MaterialIcons name="insert-chart-outlined" size={52} color={colors.border} />
-            <Text style={[styles.emptyTitle, { color: colors.onSurfaceVariant }]}>
-              No entries for {MONTH_NAMES[reportMonth - 1]}
-            </Text>
-            <Text style={[styles.emptySub, { color: colors.onSurfaceSubtle }]}>
-              Go to Home and tap a date to log work.
-            </Text>
+            <MaterialIcons name="insert-chart-outlined" size={48} color={colors.border} />
+            <Text style={[styles.emptyTitle, { color: colors.onSurfaceVariant }]}>No entries for {MONTH_NAMES[reportMonth - 1]}</Text>
+            <Text style={[styles.emptySub, { color: colors.onSurfaceSubtle }]}>Go to Home and tap a date to log work.</Text>
           </View>
         ) : null}
 
@@ -355,24 +285,22 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
   },
   title: { ...Typography.headlineLarge },
   subtitle: { ...Typography.bodySmall },
   todayBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: Radius.full },
   todayBtnText: { ...Typography.labelMedium },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
+  scrollContent: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm },
 
   monthNav: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginBottom: Spacing.lg, borderRadius: Radius.lg,
-    paddingVertical: Spacing.md, paddingHorizontal: Spacing.lg, ...Shadow.sm,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    marginBottom: Spacing.lg, borderRadius: Radius.lg, paddingVertical: Spacing.md, ...Shadow.sm,
   },
   navBtn: { padding: Spacing.sm, borderRadius: Radius.full },
   monthLabel: {
-    ...Typography.headlineMedium, flex: 1, textAlign: 'center',
-    marginHorizontal: Spacing.sm,
+    ...Typography.headlineMedium, marginHorizontal: Spacing.xl,
+    minWidth: 160, textAlign: 'center',
   },
 
   earningsBanner: {
@@ -381,24 +309,23 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md, ...Shadow.md,
   },
   bannerLabel: { ...Typography.labelMedium, color: 'rgba(255,255,255,0.75)', marginBottom: 4 },
-  bannerAmount: { ...Typography.displayMedium, color: '#FFFFFF' },
-  bannerBreakRow: { flexDirection: 'row', marginTop: 4, flexWrap: 'wrap' },
+  bannerAmount: { ...Typography.displayMedium, color: '#fff' },
+  bannerBreakRow: { flexDirection: 'row', marginTop: 4 },
   bannerChip: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 8, paddingVertical: 3,
-    borderRadius: Radius.full, marginBottom: 3,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full,
   },
   bannerChipText: { ...Typography.labelSmall, color: 'rgba(255,255,255,0.85)', marginLeft: 3 },
   bannerDivider: { width: 1, height: 56, backgroundColor: 'rgba(255,255,255,0.25)', marginHorizontal: Spacing.xl },
-  bannerRight: { alignItems: 'center', flexShrink: 0 },
+  bannerRight: { alignItems: 'center' },
   bannerSmallLabel: { ...Typography.labelSmall, color: 'rgba(255,255,255,0.7)' },
-  bannerSmallValue: { ...Typography.displayMedium, color: '#FFFFFF' },
+  bannerSmallValue: { ...Typography.displayMedium, color: '#fff' },
 
   statRow: { flexDirection: 'row', marginBottom: Spacing.md },
   statCard: {
-    flex: 1, borderRadius: Radius.lg,
-    padding: Spacing.lg, borderTopWidth: 3, ...Shadow.sm,
+    flex: 1, borderRadius: Radius.lg, padding: Spacing.lg, borderTopWidth: 3, ...Shadow.sm,
+    marginRight: Spacing.md,
   },
   statLabel: { ...Typography.labelSmall, marginTop: 6, marginBottom: 2 },
   statValue: { ...Typography.headlineMedium },
@@ -424,18 +351,15 @@ const styles = StyleSheet.create({
   entryRow: { flexDirection: 'row', alignItems: 'center', padding: Spacing.lg },
   entryLeft: { flex: 1 },
   entryDate: { ...Typography.labelLarge },
-  entryBadgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3, flexWrap: 'wrap' },
+  entryBadgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
   entryUnits: { ...Typography.bodySmall, marginRight: 8 },
   caratBadge: { flexDirection: 'row', alignItems: 'center' },
   caratBadgeText: { ...Typography.bodySmall, marginLeft: 3 },
   entryNotes: { ...Typography.bodySmall, marginTop: 2 },
-  entryRight: { alignItems: 'flex-end', marginRight: Spacing.sm, flexShrink: 0 },
+  entryRight: { alignItems: 'flex-end', marginRight: Spacing.sm },
   entryEarnings: { ...Typography.headlineSmall },
-  bestBadge: {
-    width: 22, height: 22, borderRadius: Radius.full,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  bestBadgeText: { color: '#FFFFFF', fontSize: 12 },
+  bestBadge: { width: 22, height: 22, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
+  bestBadgeText: { color: '#fff', fontSize: 12 },
 
   emptyState: { alignItems: 'center', paddingVertical: Spacing.xxxl },
   emptyTitle: { ...Typography.headlineSmall, marginTop: Spacing.md, marginBottom: Spacing.sm },

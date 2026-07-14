@@ -26,7 +26,6 @@ function getFirstDayOfMonth(year: number, month: number) {
   return new Date(year, month - 1, 1).getDay();
 }
 
-// ─── Long Press Context Menu ──────────────────────────────────────────────────
 interface LongPressMenuProps {
   visible: boolean;
   date: string;
@@ -41,9 +40,7 @@ function LongPressMenu({ visible, date, onClose, onMakeRed, onReset, colors }: L
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable style={[styles.overlay, { backgroundColor: colors.overlay }]} onPress={onClose}>
         <View style={[styles.contextMenu, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.contextTitle, { color: colors.onSurfaceVariant, borderBottomColor: colors.border }]}>
-            {date}
-          </Text>
+          <Text style={[styles.contextTitle, { color: colors.onSurfaceVariant, borderBottomColor: colors.border }]}>{date}</Text>
           <Pressable style={styles.contextItem} onPress={onMakeRed}>
             <Text style={[styles.contextItemText, { color: colors.error }]}>Make Date Red</Text>
           </Pressable>
@@ -61,7 +58,6 @@ function LongPressMenu({ visible, date, onClose, onMakeRed, onReset, colors }: L
   );
 }
 
-// ─── Month Picker ─────────────────────────────────────────────────────────────
 interface MonthPickerProps {
   visible: boolean;
   year: number;
@@ -78,11 +74,11 @@ function MonthPicker({ visible, year, month, onClose, onSelect, colors }: MonthP
       <Pressable style={[styles.overlay, { backgroundColor: colors.overlay }]} onPress={onClose}>
         <Pressable style={[styles.pickerContainer, { backgroundColor: colors.surface }]} onPress={() => {}}>
           <View style={styles.pickerHeader}>
-            <Pressable onPress={() => setPickerYear(y => y - 1)} style={styles.pickerArrow} hitSlop={8}>
+            <Pressable onPress={() => setPickerYear(y => y - 1)} style={styles.pickerArrow}>
               <Text style={[styles.pickerArrowText, { color: colors.primary }]}>‹</Text>
             </Pressable>
             <Text style={[styles.pickerYear, { color: colors.onSurface }]}>{pickerYear}</Text>
-            <Pressable onPress={() => setPickerYear(y => y + 1)} style={styles.pickerArrow} hitSlop={8}>
+            <Pressable onPress={() => setPickerYear(y => y + 1)} style={styles.pickerArrow}>
               <Text style={[styles.pickerArrowText, { color: colors.primary }]}>›</Text>
             </Pressable>
           </View>
@@ -102,7 +98,8 @@ function MonthPicker({ visible, year, month, onClose, onSelect, colors }: MonthP
                 >
                   <Text style={[
                     styles.pickerMonthText,
-                    { color: isSelected ? colors.onPrimary : colors.onSurface },
+                    { color: colors.onSurface },
+                    isSelected && { color: colors.onPrimary },
                   ]}>
                     {name.slice(0, 3)}
                   </Text>
@@ -116,30 +113,17 @@ function MonthPicker({ visible, year, month, onClose, onSelect, colors }: MonthP
   );
 }
 
-// ─── Day Cell ─────────────────────────────────────────────────────────────────
-interface DayCellProps {
-  day: number;
-  dateStr: string;
-  isToday: boolean;
-  isSelected: boolean;
-  isRed: boolean;
-  hasEntry: boolean;
-  hasCarats: boolean;
-  showCaratDot: boolean;
-  onPress: () => void;
-  onPressIn: () => void;
-  onPressOut: () => void;
-  colors: ReturnType<typeof useTheme>['colors'];
-}
-
 function DayCell({
-  day, isToday, isSelected, isRed, hasEntry, hasCarats, showCaratDot,
-  onPress, onPressIn, onPressOut, colors,
-}: DayCellProps) {
+  day, dateStr, isToday, isSelected, isSunday, isRed, hasEntry, hasCarats, onPress, onPressIn, onPressOut, colors,
+}: {
+  day: number; dateStr: string; isToday: boolean; isSelected: boolean; isSunday: boolean;
+  isRed: boolean; hasEntry: boolean; hasCarats: boolean; onPress: () => void;
+  onPressIn: () => void; onPressOut: () => void; colors: ReturnType<typeof useTheme>['colors'];
+}) {
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
-    Animated.spring(scale, { toValue: 0.86, useNativeDriver: true, speed: 40 }).start();
+    Animated.spring(scale, { toValue: 0.88, useNativeDriver: true, speed: 40 }).start();
     onPressIn();
   };
   const handlePressOut = () => {
@@ -156,47 +140,33 @@ function DayCell({
     <Pressable style={styles.dayCell} onPress={onPress} onPressIn={handlePressIn} onPressOut={handlePressOut}>
       <Animated.View style={[
         styles.dayInner,
-        isToday && !isSelected && {
-          backgroundColor: colors.primaryLight,
-          borderWidth: 2,
-          borderColor: colors.primary,
-        },
-        isSelected && {
-          backgroundColor: colors.primary,
-          elevation: 4,
-          shadowColor: colors.primary,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.4,
-          shadowRadius: 6,
-        },
+        isToday && !isSelected && { backgroundColor: colors.primaryLight, borderWidth: 2, borderColor: colors.primary },
+        isSelected && { backgroundColor: colors.primary, elevation: 4, shadowColor: colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 6 },
         { transform: [{ scale }] },
       ]}>
-        <Text style={[
-          styles.dayNumber,
-          { color: dayTextColor, fontWeight: isSelected || isToday ? '700' : '400' },
-        ]}>
+        <Text style={[styles.dayNumber, { color: dayTextColor, fontWeight: isSelected || isToday ? '700' : '400' }]}>
           {day}
         </Text>
+        {/* Dot row */}
         <View style={styles.dotRow}>
           {hasEntry ? (
             <View style={[styles.dot, { backgroundColor: isSelected ? colors.onPrimary : colors.accent }]} />
           ) : null}
-          {showCaratDot && hasCarats ? (
-            <View style={[styles.dot, { backgroundColor: isSelected ? colors.onPrimary : colors.accentMid, marginLeft: hasEntry ? 2 : 0 }]} />
+          {hasCarats ? (
+            <View style={[styles.dot, { backgroundColor: isSelected ? colors.onPrimary : colors.accentMid, marginLeft: 2 }]} />
           ) : null}
-          {!hasEntry && (!showCaratDot || !hasCarats) ? <View style={styles.dotPlaceholder} /> : null}
+          {!hasEntry && !hasCarats ? <View style={styles.dotPlaceholder} /> : null}
         </View>
       </Animated.View>
     </Pressable>
   );
 }
 
-// ─── Main Calendar ────────────────────────────────────────────────────────────
 export default function MonthCalendar() {
   const { colors } = useTheme();
   const {
     currentYear, currentMonth, selectedDate,
-    setSelectedDate, setCurrentMonth, entries, dateColors, setDateColor, caratEnabled,
+    setSelectedDate, setCurrentMonth, entries, dateColors, setDateColor,
   } = useApp();
 
   const [longPressDate, setLongPressDate] = useState<string | null>(null);
@@ -233,7 +203,6 @@ export default function MonthCalendar() {
     setSelectedDate(dateStr);
   };
 
-  // Build calendar grid
   const cells: Array<{ day: number; dateStr: string } | null> = [];
   for (let i = 0; i < firstDay; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) {
@@ -247,7 +216,7 @@ export default function MonthCalendar() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
-      {/* Calendar Header */}
+      {/* Header */}
       <View style={[styles.headerBar, { backgroundColor: colors.gradientPrimaryStart }]}>
         <Pressable onPress={goToPrev} style={styles.navBtn} hitSlop={8}>
           <Text style={styles.navBtnText}>‹</Text>
@@ -263,14 +232,14 @@ export default function MonthCalendar() {
         </Pressable>
       </View>
 
-      {/* Day name row */}
+      {/* Day names */}
       <View style={[styles.dayNamesRow, { backgroundColor: colors.primaryLight }]}>
         {DAY_NAMES.map((d, i) => (
           <Text key={d} style={[styles.dayName, { color: i === 0 ? colors.error : colors.primary }]}>{d}</Text>
         ))}
       </View>
 
-      {/* Calendar grid */}
+      {/* Weeks */}
       <View style={styles.gridArea}>
         {weeks.map((week, wi) => (
           <View key={wi} style={styles.weekRow}>
@@ -288,10 +257,10 @@ export default function MonthCalendar() {
                   dateStr={dateStr}
                   isToday={dateStr === today}
                   isSelected={dateStr === selectedDate}
+                  isSunday={isSunday}
                   isRed={isRed}
                   hasEntry={!!entry && entry.workCount > 0}
                   hasCarats={!!(entry?.caratWeight && entry.caratWeight > 0)}
-                  showCaratDot={caratEnabled}
                   onPress={() => handleDayPress(dateStr)}
                   onPressIn={() => handlePressIn(dateStr)}
                   onPressOut={handlePressOut}
@@ -309,12 +278,10 @@ export default function MonthCalendar() {
           <View style={[styles.legendDot, { backgroundColor: colors.accent }]} />
           <Text style={[styles.legendText, { color: colors.onSurfaceSubtle }]}>Units</Text>
         </View>
-        {caratEnabled ? (
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.accentMid }]} />
-            <Text style={[styles.legendText, { color: colors.onSurfaceSubtle }]}>Carats</Text>
-          </View>
-        ) : null}
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: colors.accentMid }]} />
+          <Text style={[styles.legendText, { color: colors.onSurfaceSubtle }]}>Carats</Text>
+        </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: colors.primary, borderWidth: 2, borderColor: colors.primary }]} />
           <Text style={[styles.legendText, { color: colors.onSurfaceSubtle }]}>Today</Text>
@@ -342,40 +309,66 @@ export default function MonthCalendar() {
 }
 
 const styles = StyleSheet.create({
-  container: { borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.md },
-
+  container: {
+    borderRadius: Radius.xl,
+    overflow: 'hidden',
+    ...Shadow.md,
+  },
   headerBar: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: Spacing.md, paddingVertical: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
   },
   navBtn: {
-    width: 36, height: 36, borderRadius: Radius.full,
-    alignItems: 'center', justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.18)',
   },
-  navBtnText: { fontSize: 22, color: '#FFFFFF', lineHeight: 26, fontWeight: '700' },
+  navBtnText: { fontSize: 22, color: '#fff', lineHeight: 26, fontWeight: '700' },
   monthTitle: { flex: 1, marginHorizontal: Spacing.sm },
-  monthTitleText: { ...Typography.headlineMedium, color: '#FFFFFF' },
+  monthTitleText: { ...Typography.headlineMedium, color: '#fff' },
   todayBtn: {
-    paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs,
-    borderRadius: Radius.full, backgroundColor: 'rgba(255,255,255,0.22)',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
-  todayBtnText: { ...Typography.labelMedium, color: '#FFFFFF' },
+  todayBtnText: { ...Typography.labelMedium, color: '#fff' },
 
   dayNamesRow: {
-    flexDirection: 'row', paddingVertical: Spacing.xs, paddingHorizontal: Spacing.xs,
+    flexDirection: 'row',
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.xs,
   },
   dayName: {
-    flex: 1, textAlign: 'center',
-    ...Typography.labelSmall, fontWeight: '700', paddingVertical: 4,
+    flex: 1,
+    textAlign: 'center',
+    ...Typography.labelSmall,
+    fontWeight: '700',
+    paddingVertical: 4,
   },
 
-  gridArea: { paddingHorizontal: Spacing.xs, paddingTop: Spacing.xs, paddingBottom: 2 },
+  gridArea: {
+    paddingHorizontal: Spacing.xs,
+    paddingTop: Spacing.xs,
+    paddingBottom: 2,
+  },
   weekRow: { flexDirection: 'row' },
-  dayCell: { flex: 1, alignItems: 'center', paddingVertical: 3 },
+  dayCell: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 3,
+  },
   dayInner: {
-    width: 38, height: 44, borderRadius: Radius.md,
-    alignItems: 'center', justifyContent: 'center',
+    width: 38,
+    height: 44,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dayNumber: { ...Typography.bodyMedium },
   dotRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
@@ -383,36 +376,55 @@ const styles = StyleSheet.create({
   dotPlaceholder: { width: 5, height: 5 },
 
   legendStrip: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg, borderTopWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderTopWidth: 1,
   },
   legendItem: { flexDirection: 'row', alignItems: 'center', marginRight: Spacing.xl },
   legendDot: { width: 8, height: 8, borderRadius: 4, marginRight: 5 },
   legendText: { ...Typography.labelSmall, fontSize: 10 },
 
   overlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  contextMenu: { borderRadius: Radius.xl, width: 240, overflow: 'hidden', ...Shadow.lg },
+  contextMenu: {
+    borderRadius: Radius.xl,
+    width: 240,
+    overflow: 'hidden',
+    ...Shadow.lg,
+  },
   contextTitle: {
-    ...Typography.labelMedium, textAlign: 'center',
-    padding: Spacing.lg, borderBottomWidth: 1,
+    ...Typography.labelMedium,
+    textAlign: 'center',
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
   },
   contextItem: { padding: Spacing.lg, alignItems: 'center' },
   contextItemText: { ...Typography.bodyLarge },
   contextDivider: { height: 1 },
-
-  pickerContainer: { borderRadius: Radius.xl, width: 300, padding: Spacing.lg, ...Shadow.lg },
+  pickerContainer: {
+    borderRadius: Radius.xl,
+    width: 300,
+    padding: Spacing.lg,
+    ...Shadow.lg,
+  },
   pickerHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', marginBottom: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.lg,
   },
   pickerArrow: { padding: Spacing.sm },
   pickerArrowText: { fontSize: 28, lineHeight: 32 },
   pickerYear: { ...Typography.headlineLarge },
   pickerMonths: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -Spacing.xs },
   pickerMonth: {
-    width: '30%', margin: Spacing.xs,
-    paddingVertical: Spacing.md, borderRadius: Radius.md, alignItems: 'center',
+    width: '30%',
+    margin: Spacing.xs,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    alignItems: 'center',
   },
   pickerMonthText: { ...Typography.labelLarge },
 });

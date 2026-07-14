@@ -8,7 +8,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Switch,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -22,14 +21,11 @@ function formatRupee(n: number): string {
   return '₹' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 export default function EntryScreen() {
   const { date } = useLocalSearchParams<{ date: string }>();
   const router = useRouter();
   const { colors } = useTheme();
-  const { getEntryForDate, saveEntry, deleteEntry, settings, caratEnabled } = useApp();
+  const { getEntryForDate, saveEntry, deleteEntry, settings } = useApp();
   const { showAlert } = useAlert();
 
   const existing = date ? getEntryForDate(date) : undefined;
@@ -38,22 +34,24 @@ export default function EntryScreen() {
   const [caratWeight, setCaratWeight] = useState(
     existing?.caratWeight != null ? existing.caratWeight.toString() : ''
   );
-  const [notes, setNotes] = useState(existing?.notes ?? '');
+  const [notes, setNotes] = useState(existing ? existing.notes : '');
   const [saving, setSaving] = useState(false);
 
   const parsedDate = date ? parseDate(date) : new Date();
+  const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const dateLabel = `${WEEKDAYS[parsedDate.getDay()]}, ${parsedDate.getDate()} ${MONTHS[parsedDate.getMonth()]} ${parsedDate.getFullYear()}`;
 
   const units = parseInt(workCount) || 0;
-  const carats = caratEnabled ? (parseFloat(caratWeight) || 0) : 0;
-  const caratRate = settings.caratRate ?? 100;
+  const carats = parseFloat(caratWeight) || 0;
   const unitEarnings = units * settings.ratePerUnit;
-  const caratEarnings = caratEnabled ? carats * caratRate : 0;
+  const caratRate = settings.caratRate ?? 100;
+  const caratEarnings = carats * caratRate;
   const totalEarnings = unitEarnings + caratEarnings;
 
   const handleSave = async () => {
     const countVal = parseInt(workCount) || 0;
-    const caratVal = caratEnabled ? (parseFloat(caratWeight) || 0) : 0;
+    const caratVal = parseFloat(caratWeight) || 0;
     if (countVal < 0 || caratVal < 0) {
       showAlert('Invalid Entry', 'Values cannot be negative.');
       return;
@@ -63,9 +61,9 @@ export default function EntryScreen() {
     await saveEntry({
       date,
       workCount: countVal,
-      caratWeight: caratEnabled && caratVal > 0 ? caratVal : undefined,
+      caratWeight: caratVal > 0 ? caratVal : undefined,
       notes: notes || '',
-      createdAt: existing?.createdAt ?? new Date().toISOString(),
+      createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
     setSaving(false);
@@ -83,13 +81,12 @@ export default function EntryScreen() {
     ]);
   };
 
+  const styles = makeStyles(colors);
+
   return (
     <>
       <Stack.Screen options={{ title: existing ? 'Edit Entry' : 'Log Work', headerShown: true }} />
-      <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: colors.background }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.content}
@@ -97,35 +94,27 @@ export default function EntryScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {/* Date header */}
-          <View style={[styles.dateCard, {
-            backgroundColor: colors.primaryContainer,
-            borderLeftColor: colors.primary,
-          }]}>
+          <View style={styles.dateCard}>
             <MaterialIcons name="event" size={20} color={colors.primary} />
             <View style={{ flex: 1, marginLeft: Spacing.md }}>
-              <Text style={[styles.dateText, { color: colors.onSurface }]}>{dateLabel}</Text>
-              <Text style={[styles.dateSub, { color: colors.onSurfaceVariant }]}>
-                ₹{settings.ratePerUnit.toFixed(2)}/unit
-                {caratEnabled ? ` · ₹${caratRate.toFixed(2)}/carat` : ''}
-              </Text>
+              <Text style={styles.dateText}>{dateLabel}</Text>
+              <Text style={styles.dateSub}>@ ₹{settings.ratePerUnit.toFixed(2)}/unit · ₹{caratRate.toFixed(2)}/carat</Text>
             </View>
           </View>
 
-          {/* ── Work Units Block ── */}
-          <View style={[styles.entryBlock, { backgroundColor: colors.surface }]}>
+          {/* ── Entry Type 1: Work Units ── */}
+          <View style={styles.entryBlock}>
             <View style={styles.entryBlockHeader}>
               <View style={[styles.entryTypeTag, { backgroundColor: colors.primaryLight }]}>
                 <MaterialIcons name="bar-chart" size={14} color={colors.primary} />
                 <Text style={[styles.entryTypeText, { color: colors.primary }]}>Work Units</Text>
               </View>
-              <Text style={[styles.entryTypeRate, { color: colors.onSurfaceSubtle }]}>
-                ₹{settings.ratePerUnit.toFixed(2)}/unit
-              </Text>
+              <Text style={styles.entryTypeRate}>₹{settings.ratePerUnit.toFixed(2)}/unit</Text>
             </View>
-            <View style={[styles.inputWrapper, { backgroundColor: colors.surfaceVariant, borderColor: colors.border }]}>
+            <View style={styles.inputWrapper}>
               <MaterialIcons name="bar-chart" size={20} color={colors.primary} style={{ marginRight: 8 }} />
               <TextInput
-                style={[styles.mainInput, { color: colors.onSurface }]}
+                style={styles.mainInput}
                 value={workCount}
                 onChangeText={setWorkCount}
                 keyboardType="numeric"
@@ -134,7 +123,7 @@ export default function EntryScreen() {
                 autoFocus={!existing}
                 returnKeyType="next"
               />
-              <Text style={[styles.unitLabel, { color: colors.onSurfaceSubtle }]}>units</Text>
+              <Text style={styles.unitLabel}>units</Text>
               {workCount !== '' ? (
                 <Pressable onPress={() => setWorkCount('')} hitSlop={8}>
                   <MaterialIcons name="clear" size={18} color={colors.onSurfaceSubtle} />
@@ -151,68 +140,55 @@ export default function EntryScreen() {
             ) : null}
           </View>
 
-          {/* ── Carat Weight Block (conditional) ── */}
-          {caratEnabled ? (
-            <View style={[styles.entryBlock, { backgroundColor: colors.surface }]}>
-              <View style={styles.entryBlockHeader}>
-                <View style={[styles.entryTypeTag, { backgroundColor: colors.accentLight }]}>
-                  <MaterialIcons name="diamond" size={14} color={colors.accent} />
-                  <Text style={[styles.entryTypeText, { color: colors.accent }]}>Carat Weight</Text>
-                </View>
-                <Text style={[styles.entryTypeRate, { color: colors.onSurfaceSubtle }]}>
-                  ₹{caratRate.toFixed(2)}/carat
-                </Text>
+          {/* ── Entry Type 2: Carat Weight ── */}
+          <View style={styles.entryBlock}>
+            <View style={styles.entryBlockHeader}>
+              <View style={[styles.entryTypeTag, { backgroundColor: colors.accentLight }]}>
+                <MaterialIcons name="diamond" size={14} color={colors.accent} />
+                <Text style={[styles.entryTypeText, { color: colors.accent }]}>Carat Weight</Text>
               </View>
-              <View style={[styles.inputWrapper, { backgroundColor: colors.surfaceVariant, borderColor: colors.border }]}>
-                <MaterialIcons name="diamond" size={20} color={colors.accent} style={{ marginRight: 8 }} />
-                <TextInput
-                  style={[styles.mainInput, { color: colors.onSurface }]}
-                  value={caratWeight}
-                  onChangeText={setCaratWeight}
-                  keyboardType="decimal-pad"
-                  placeholder="0.00"
-                  placeholderTextColor={colors.onSurfaceSubtle}
-                  returnKeyType="next"
-                />
-                <Text style={[styles.unitLabel, { color: colors.onSurfaceSubtle }]}>ct</Text>
-                {caratWeight !== '' ? (
-                  <Pressable onPress={() => setCaratWeight('')} hitSlop={8}>
-                    <MaterialIcons name="clear" size={18} color={colors.onSurfaceSubtle} />
-                  </Pressable>
-                ) : null}
-              </View>
-              {carats > 0 ? (
-                <View style={styles.miniEarning}>
-                  <MaterialIcons name="currency-rupee" size={13} color={colors.accentMid} />
-                  <Text style={[styles.miniEarningText, { color: colors.accentMid }]}>
-                    {carats} ct × ₹{caratRate.toFixed(2)} = {formatRupee(caratEarnings)}
-                  </Text>
-                </View>
+              <Text style={styles.entryTypeRate}>₹{caratRate.toFixed(2)}/carat</Text>
+            </View>
+            <View style={styles.inputWrapper}>
+              <MaterialIcons name="diamond" size={20} color={colors.accent} style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.mainInput}
+                value={caratWeight}
+                onChangeText={setCaratWeight}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor={colors.onSurfaceSubtle}
+                returnKeyType="next"
+              />
+              <Text style={styles.unitLabel}>ct</Text>
+              {caratWeight !== '' ? (
+                <Pressable onPress={() => setCaratWeight('')} hitSlop={8}>
+                  <MaterialIcons name="clear" size={18} color={colors.onSurfaceSubtle} />
+                </Pressable>
               ) : null}
             </View>
-          ) : null}
+            {carats > 0 ? (
+              <View style={styles.miniEarning}>
+                <MaterialIcons name="currency-rupee" size={13} color={colors.accentMid} />
+                <Text style={[styles.miniEarningText, { color: colors.accentMid }]}>
+                  {carats} ct × ₹{caratRate.toFixed(2)} = {formatRupee(caratEarnings)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
 
           {/* Total earnings preview */}
-          {(units > 0 || (caratEnabled && carats > 0)) ? (
-            <View style={[styles.earningsCard, {
-              backgroundColor: colors.primaryContainer,
-              borderColor: colors.primaryLight,
-            }]}>
+          {(units > 0 || carats > 0) ? (
+            <View style={styles.earningsCard}>
               <View style={styles.earningsRow}>
-                <View style={{ flex: 1, marginRight: Spacing.md }}>
-                  <Text style={[styles.earningsLabel, { color: colors.primary }]}>
-                    {caratEnabled ? "Today's Total Earnings" : "Today's Earnings"}
-                  </Text>
+                <View>
+                  <Text style={[styles.earningsLabel, { color: colors.primary }]}>Today's Total Earnings</Text>
                   <View style={{ marginTop: 4 }}>
                     {units > 0 ? (
-                      <Text style={[styles.earningsLine, { color: colors.onSurfaceVariant }]}>
-                        Units: {formatRupee(unitEarnings)}
-                      </Text>
+                      <Text style={styles.earningsLine}>Units: {formatRupee(unitEarnings)}</Text>
                     ) : null}
-                    {caratEnabled && carats > 0 ? (
-                      <Text style={[styles.earningsLine, { color: colors.onSurfaceVariant }]}>
-                        Carats: {formatRupee(caratEarnings)}
-                      </Text>
+                    {carats > 0 ? (
+                      <Text style={styles.earningsLine}>Carats: {formatRupee(caratEarnings)}</Text>
                     ) : null}
                   </View>
                 </View>
@@ -224,9 +200,9 @@ export default function EntryScreen() {
           {/* Notes */}
           <View style={styles.section}>
             <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>Notes (Optional)</Text>
-            <View style={[styles.inputWrapper, styles.notesWrapper, { backgroundColor: colors.surfaceVariant, borderColor: colors.border }]}>
+            <View style={[styles.inputWrapper, styles.notesWrapper]}>
               <TextInput
-                style={[styles.mainInput, styles.notesInput, { color: colors.onSurface }]}
+                style={[styles.mainInput, styles.notesInput]}
                 value={notes}
                 onChangeText={setNotes}
                 placeholder="Any notes for this day..."
@@ -251,10 +227,7 @@ export default function EntryScreen() {
           </Pressable>
 
           {existing ? (
-            <Pressable
-              style={[styles.deleteBtn, { borderColor: colors.error + '60', backgroundColor: colors.errorLight }]}
-              onPress={handleDelete}
-            >
+            <Pressable style={[styles.deleteBtn, { borderColor: colors.error + '60', backgroundColor: colors.errorLight }]} onPress={handleDelete}>
               <MaterialIcons name="delete-outline" size={18} color={colors.error} />
               <Text style={[styles.deleteBtnText, { color: colors.error }]}>Delete Entry</Text>
             </Pressable>
@@ -265,72 +238,125 @@ export default function EntryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  scroll: { flex: 1 },
-  content: { padding: Spacing.lg, paddingBottom: Spacing.xxxl },
+function makeStyles(colors: ReturnType<typeof useTheme>['colors']) {
+  return StyleSheet.create({
+    scroll: { flex: 1, backgroundColor: colors.background },
+    content: { padding: Spacing.lg },
+    dateCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: Spacing.lg,
+      backgroundColor: colors.primaryContainer,
+      borderRadius: Radius.lg,
+      padding: Spacing.lg,
+      borderLeftWidth: 4,
+      borderLeftColor: colors.primary,
+    },
+    dateText: { ...Typography.headlineSmall, color: colors.onSurface },
+    dateSub: { ...Typography.bodySmall, color: colors.onSurfaceVariant, marginTop: 2 },
 
-  dateCard: {
-    flexDirection: 'row', alignItems: 'center',
-    marginBottom: Spacing.lg, borderRadius: Radius.lg,
-    padding: Spacing.lg, borderLeftWidth: 4,
-  },
-  dateText: { ...Typography.headlineSmall },
-  dateSub: { ...Typography.bodySmall, marginTop: 2 },
+    entryBlock: {
+      backgroundColor: colors.surface,
+      borderRadius: Radius.lg,
+      padding: Spacing.lg,
+      marginBottom: Spacing.md,
+      ...Shadow.sm,
+    },
+    entryBlockHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: Spacing.md,
+    },
+    entryTypeTag: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: Spacing.md,
+      paddingVertical: 5,
+      borderRadius: Radius.full,
+    },
+    entryTypeText: {
+      ...Typography.labelMedium,
+      marginLeft: 5,
+    },
+    entryTypeRate: {
+      ...Typography.bodySmall,
+      color: colors.onSurfaceSubtle,
+    },
+    inputWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceVariant,
+      borderRadius: Radius.md,
+      padding: Spacing.md,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+    },
+    mainInput: {
+      ...Typography.headlineMedium,
+      color: colors.onSurface,
+      flex: 1,
+      padding: 0,
+      includeFontPadding: false,
+    },
+    unitLabel: {
+      ...Typography.bodyMedium,
+      color: colors.onSurfaceSubtle,
+      marginRight: Spacing.sm,
+    },
+    miniEarning: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: Spacing.sm,
+      paddingHorizontal: 2,
+    },
+    miniEarningText: {
+      ...Typography.bodySmall,
+      marginLeft: 4,
+      fontWeight: '600',
+    },
 
-  entryBlock: {
-    borderRadius: Radius.lg, padding: Spacing.lg,
-    marginBottom: Spacing.md, ...Shadow.sm,
-  },
-  entryBlockHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', marginBottom: Spacing.md,
-  },
-  entryTypeTag: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: Spacing.md, paddingVertical: 5, borderRadius: Radius.full,
-  },
-  entryTypeText: { ...Typography.labelMedium, marginLeft: 5 },
-  entryTypeRate: { ...Typography.bodySmall },
+    earningsCard: {
+      backgroundColor: colors.primaryContainer,
+      borderRadius: Radius.lg,
+      padding: Spacing.lg,
+      borderWidth: 1.5,
+      borderColor: colors.primaryLight,
+      marginBottom: Spacing.lg,
+    },
+    earningsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    earningsLabel: { ...Typography.labelLarge },
+    earningsLine: { ...Typography.bodySmall, color: colors.onSurfaceVariant, lineHeight: 18 },
+    earningsAmount: { ...Typography.displayMedium },
 
-  inputWrapper: {
-    flexDirection: 'row', alignItems: 'center',
-    borderRadius: Radius.md, padding: Spacing.md,
-    borderWidth: 1.5,
-  },
-  mainInput: {
-    ...Typography.headlineMedium, flex: 1,
-    padding: 0, includeFontPadding: false,
-  },
-  unitLabel: { ...Typography.bodyMedium, marginRight: Spacing.sm },
-  miniEarning: {
-    flexDirection: 'row', alignItems: 'center',
-    marginTop: Spacing.sm, paddingHorizontal: 2,
-  },
-  miniEarningText: { ...Typography.bodySmall, marginLeft: 4, fontWeight: '600' },
+    section: { marginBottom: Spacing.lg },
+    label: { ...Typography.labelLarge, paddingLeft: 4, marginBottom: Spacing.sm },
+    notesWrapper: { alignItems: 'flex-start', minHeight: 100 },
+    notesInput: { ...Typography.bodyLarge, lineHeight: 24, minHeight: 80 },
 
-  earningsCard: {
-    borderRadius: Radius.lg, padding: Spacing.lg,
-    borderWidth: 1.5, marginBottom: Spacing.lg,
-  },
-  earningsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  earningsLabel: { ...Typography.labelLarge },
-  earningsLine: { ...Typography.bodySmall, lineHeight: 18 },
-  earningsAmount: { ...Typography.displayMedium },
-
-  section: { marginBottom: Spacing.lg },
-  label: { ...Typography.labelLarge, paddingLeft: 4, marginBottom: Spacing.sm },
-  notesWrapper: { alignItems: 'flex-start', minHeight: 100 },
-  notesInput: { ...Typography.bodyLarge, lineHeight: 24, minHeight: 80 },
-
-  primaryBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    borderRadius: Radius.lg, padding: Spacing.lg, marginTop: Spacing.sm, elevation: 4,
-  },
-  primaryBtnText: { ...Typography.headlineSmall, marginLeft: Spacing.sm },
-  deleteBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    padding: Spacing.lg, borderRadius: Radius.lg,
-    borderWidth: 1.5, marginTop: Spacing.md,
-  },
-  deleteBtnText: { ...Typography.labelLarge, marginLeft: Spacing.sm },
-});
+    primaryBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: Radius.lg,
+      padding: Spacing.lg,
+      marginTop: Spacing.sm,
+      elevation: 4,
+    },
+    primaryBtnText: { ...Typography.headlineSmall, marginLeft: Spacing.sm },
+    deleteBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: Spacing.lg,
+      borderRadius: Radius.lg,
+      borderWidth: 1.5,
+      marginTop: Spacing.md,
+    },
+    deleteBtnText: { ...Typography.labelLarge, marginLeft: Spacing.sm },
+  });
+}

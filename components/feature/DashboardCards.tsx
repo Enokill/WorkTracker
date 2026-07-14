@@ -20,10 +20,6 @@ function formatCount(n: number): string {
   return n.toLocaleString('en-IN');
 }
 
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-// ─── Earnings Card (gradient) ─────────────────────────────────────────────────
 interface EarningsCardProps {
   label: string;
   sublabel: string;
@@ -34,46 +30,43 @@ interface EarningsCardProps {
   gradientColors: readonly [string, string];
   secondaryCount?: number;
   secondaryLabel?: string;
-  showSecondary?: boolean;
 }
 
-function EarningsCard({
-  label, sublabel, count, countLabel, amount, iconName, gradientColors,
-  secondaryCount, secondaryLabel, showSecondary,
-}: EarningsCardProps) {
+function EarningsCard({ label, sublabel, count, countLabel, amount, iconName, gradientColors, secondaryCount, secondaryLabel }: EarningsCardProps) {
   return (
     <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradientCard}>
       <View style={styles.cardTopRow}>
         <View style={styles.cardIconWrap}>
           <MaterialIcons name={iconName as any} size={18} color="rgba(255,255,255,0.9)" />
         </View>
-        <Text style={styles.gradientCardLabel} numberOfLines={1}>{label}</Text>
+        <Text style={styles.gradientCardLabel}>{label}</Text>
       </View>
       <Text style={styles.gradientCardCount}>{formatCount(count)}</Text>
       <Text style={styles.gradientCardUnit}>{countLabel}</Text>
-      {showSecondary && secondaryCount != null && secondaryCount > 0 ? (
+      {secondaryCount != null && secondaryCount > 0 ? (
         <Text style={styles.gradientSecondary}>+ {secondaryCount.toFixed(2)} {secondaryLabel}</Text>
       ) : null}
       <View style={styles.gradientDivider} />
       <View style={styles.cardBottomRow}>
-        <Text style={styles.gradientSublabel} numberOfLines={1}>{sublabel}</Text>
+        <Text style={styles.gradientSublabel}>{sublabel}</Text>
         <Text style={styles.gradientCardAmount}>{formatRupee(amount)}</Text>
       </View>
     </LinearGradient>
   );
 }
 
-// ─── Selected Day Card ────────────────────────────────────────────────────────
 function SelectedDayCard() {
   const { colors } = useTheme();
-  const { selectedDate, getEntryForDate, settings, caratEnabled } = useApp();
+  const { selectedDate, getEntryForDate, settings } = useApp();
   const entry = getEntryForDate(selectedDate);
-  const workCount = entry?.workCount ?? 0;
-  const caratWeight = caratEnabled ? (entry?.caratWeight ?? 0) : 0;
+  const workCount = entry ? entry.workCount : 0;
+  const caratWeight = entry?.caratWeight ?? 0;
   const caratRate = settings.caratRate ?? 100;
-  const earnings = (workCount * settings.ratePerUnit) + (caratEnabled ? caratWeight * caratRate : 0);
+  const earnings = (workCount * settings.ratePerUnit) + (caratWeight * caratRate);
   const d = parseDate(selectedDate);
-  const label = `${DAYS_SHORT[d.getDay()]}, ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
+  const MONTHS_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const DAYS_S = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const label = `${DAYS_S[d.getDay()]}, ${d.getDate()} ${MONTHS_S[d.getMonth()]}`;
 
   return (
     <View style={[styles.surfaceCard, { backgroundColor: colors.surface, borderLeftColor: colors.secondary }]}>
@@ -86,27 +79,21 @@ function SelectedDayCard() {
       <Text style={[styles.surfaceCardDate, { color: colors.onSurfaceSubtle }]}>{label}</Text>
       <Text style={[styles.surfaceCardCount, { color: colors.onSurface }]}>{formatCount(workCount)}</Text>
       <Text style={[styles.surfaceCardUnit, { color: colors.onSurfaceSubtle }]}>units</Text>
-      {caratEnabled && caratWeight > 0 ? (
-        <Text style={[styles.surfaceCardUnit, { color: colors.accentMid, marginTop: 1 }]}>
-          + {caratWeight.toFixed(2)} ct
-        </Text>
+      {caratWeight > 0 ? (
+        <Text style={[styles.surfaceCardUnit, { color: colors.accentMid }]}>+ {caratWeight.toFixed(2)} ct</Text>
       ) : null}
       <Text style={[styles.surfaceCardAmount, { color: colors.secondary }]}>{formatRupee(earnings)}</Text>
     </View>
   );
 }
 
-// ─── Advance Salary Card ──────────────────────────────────────────────────────
 function AdvanceSalaryCard() {
   const { colors } = useTheme();
   const { advanceSalary, updateAdvanceSalary } = useApp();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
 
-  const handlePress = () => {
-    setValue(advanceSalary > 0 ? advanceSalary.toString() : '');
-    setEditing(true);
-  };
+  const handlePress = () => { setValue(advanceSalary > 0 ? advanceSalary.toString() : ''); setEditing(true); };
   const handleSave = async () => {
     const parsed = parseFloat(value);
     await updateAdvanceSalary(isNaN(parsed) ? 0 : parsed);
@@ -150,7 +137,6 @@ function AdvanceSalaryCard() {
   );
 }
 
-// ─── Payable Income Card ──────────────────────────────────────────────────────
 function PayableCard() {
   const { colors } = useTheme();
   const { payableIncome, monthEarnings, advanceSalary } = useApp();
@@ -158,11 +144,7 @@ function PayableCard() {
 
   return (
     <LinearGradient
-      colors={
-        isNegative
-          ? ([colors.error, '#7F1D1D'] as const)
-          : ([colors.gradientPrimaryStart, colors.primaryMid] as const)
-      }
+      colors={isNegative ? [colors.error, '#7F1D1D'] as const : [colors.gradientPrimaryStart, colors.primaryMid] as const}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 0 }}
       style={styles.payableCard}
@@ -174,7 +156,7 @@ function PayableCard() {
           </View>
           <Text style={styles.payableLabel}>Payable Income</Text>
         </View>
-        <Text style={styles.payableFormula} numberOfLines={1}>
+        <Text style={styles.payableFormula}>
           {formatRupee(monthEarnings)} − {formatRupee(advanceSalary)} advance
         </Text>
       </View>
@@ -186,26 +168,21 @@ function PayableCard() {
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
 export default function DashboardCards() {
   const { colors } = useTheme();
-  const { weekTotal, monthTotal, weekEarnings, monthEarnings, settings, entries, caratEnabled, currentYear, currentMonth } = useApp();
+  const { weekTotal, monthTotal, weekEarnings, monthEarnings, settings, entries, currentYear, currentMonth } = useApp();
 
+  // Week carat totals
   const today = new Date();
   const weekDates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(today);
     d.setDate(today.getDate() - today.getDay() + i);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   });
+  const weekCarats = entries.filter(e => weekDates.includes(e.date)).reduce((s, e) => s + (e.caratWeight ?? 0), 0);
 
-  const weekCarats = caratEnabled
-    ? entries.filter(e => weekDates.includes(e.date)).reduce((s, e) => s + (e.caratWeight ?? 0), 0)
-    : 0;
-
-  const monthPrefix = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
-  const monthCarats = caratEnabled
-    ? entries.filter(e => e.date.startsWith(monthPrefix)).reduce((s, e) => s + (e.caratWeight ?? 0), 0)
-    : 0;
+  const monthPrefix = `${currentYear}-${String(currentMonth).padStart(2,'0')}`;
+  const monthCarats = entries.filter(e => e.date.startsWith(monthPrefix)).reduce((s, e) => s + (e.caratWeight ?? 0), 0);
 
   return (
     <View>
@@ -220,7 +197,6 @@ export default function DashboardCards() {
           gradientColors={[colors.primaryMid, '#60A5FA']}
           secondaryCount={weekCarats}
           secondaryLabel="ct"
-          showSecondary={caratEnabled}
         />
         <View style={{ width: Spacing.md }} />
         <EarningsCard
@@ -233,7 +209,6 @@ export default function DashboardCards() {
           gradientColors={[colors.accent, colors.gradientAccentEnd]}
           secondaryCount={monthCarats}
           secondaryLabel="ct"
-          showSecondary={caratEnabled}
         />
       </View>
 
@@ -261,26 +236,24 @@ const styles = StyleSheet.create({
   cardIconWrap: {
     width: 30, height: 30, borderRadius: Radius.md,
     backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center', justifyContent: 'center',
-    marginRight: Spacing.sm, flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm,
   },
-  gradientCardLabel: { ...Typography.labelMedium, color: 'rgba(255,255,255,0.85)', flex: 1 },
-  gradientCardCount: { fontSize: 28, fontWeight: '800', color: '#FFFFFF', letterSpacing: -1, marginTop: Spacing.xs },
+  gradientCardLabel: { ...Typography.labelMedium, color: 'rgba(255,255,255,0.85)' },
+  gradientCardCount: { fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: -1, marginTop: Spacing.xs },
   gradientCardUnit: { ...Typography.labelSmall, color: 'rgba(255,255,255,0.65)', marginBottom: 2 },
   gradientSecondary: { ...Typography.labelSmall, color: 'rgba(255,255,255,0.75)', marginBottom: Spacing.xs },
   gradientDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: Spacing.sm },
   cardBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  gradientSublabel: { ...Typography.labelSmall, color: 'rgba(255,255,255,0.65)', flex: 1, marginRight: 4 },
-  gradientCardAmount: { ...Typography.headlineSmall, color: '#FFFFFF' },
+  gradientSublabel: { ...Typography.labelSmall, color: 'rgba(255,255,255,0.65)' },
+  gradientCardAmount: { ...Typography.headlineSmall, color: '#fff' },
 
   surfaceCard: {
     flex: 1, borderRadius: Radius.xl, padding: Spacing.lg, borderLeftWidth: 4, ...Shadow.sm,
   },
   surfaceIconWrap: {
-    width: 28, height: 28, borderRadius: Radius.md,
-    alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm, flexShrink: 0,
+    width: 28, height: 28, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm,
   },
-  surfaceCardLabel: { ...Typography.labelMedium, flex: 1 },
+  surfaceCardLabel: { ...Typography.labelMedium },
   surfaceCardDate: { ...Typography.bodySmall, marginTop: 2, marginBottom: Spacing.sm },
   surfaceCardCount: { fontSize: 24, fontWeight: '800', letterSpacing: -0.8 },
   surfaceCardUnit: { ...Typography.labelSmall, marginBottom: Spacing.xs },
@@ -291,20 +264,18 @@ const styles = StyleSheet.create({
   advanceInput: { flex: 1, padding: 0, includeFontPadding: false },
 
   payableCard: {
-    borderRadius: Radius.xl, padding: Spacing.xl,
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', ...Shadow.lg,
+    borderRadius: Radius.xl, padding: Spacing.xl, flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'space-between', ...Shadow.lg,
   },
   payableLeft: { flex: 1, marginRight: Spacing.md },
   payableIconRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm },
   payableIconWrap: {
     width: 36, height: 36, borderRadius: Radius.lg,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm, flexShrink: 0,
+    backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm,
   },
-  payableLabel: { ...Typography.headlineSmall, color: '#FFFFFF' },
+  payableLabel: { ...Typography.headlineSmall, color: '#fff' },
   payableFormula: { ...Typography.bodySmall, color: 'rgba(255,255,255,0.65)', lineHeight: 18 },
-  payableRight: { alignItems: 'flex-end', flexShrink: 0 },
-  payableAmount: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.8 },
+  payableRight: { alignItems: 'flex-end' },
+  payableAmount: { fontSize: 26, fontWeight: '800', color: '#fff', letterSpacing: -0.8 },
   payableSubLabel: { ...Typography.labelSmall, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
 });

@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export interface WorkEntry {
   date: string; // YYYY-MM-DD
   workCount: number;
-  caratWeight?: number;   // weight in carats (optional second entry type)
+  caratWeight?: number;   // weight in carats (optional second entry)
   notes: string;
   createdAt: string;
   updatedAt: string;
@@ -12,7 +12,6 @@ export interface WorkEntry {
 export interface AppSettings {
   ratePerUnit: number;    // rate per work unit (₹)
   caratRate?: number;     // rate per carat (₹), default 100
-  caratEnabled?: boolean; // feature flag — show/hide all carat UI
   username?: string;
 }
 
@@ -36,8 +35,7 @@ export interface BackupData {
   advanceKeys: Array<{ key: string; value: number }>;
 }
 
-// ─── Work Entries ─────────────────────────────────────────────────────────────
-
+// Work Entries
 export async function getAllEntries(): Promise<WorkEntry[]> {
   try {
     const raw = await AsyncStorage.getItem(KEYS.ENTRIES);
@@ -50,42 +48,32 @@ export async function getAllEntries(): Promise<WorkEntry[]> {
 export async function saveEntry(entry: WorkEntry): Promise<void> {
   const all = await getAllEntries();
   const idx = all.findIndex(e => e.date === entry.date);
-  const now = new Date().toISOString();
   if (idx >= 0) {
-    all[idx] = { ...entry, updatedAt: now };
+    all[idx] = { ...entry, updatedAt: new Date().toISOString() };
   } else {
-    all.push({ ...entry, createdAt: now, updatedAt: now });
+    all.push({ ...entry, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
   }
   await AsyncStorage.setItem(KEYS.ENTRIES, JSON.stringify(all));
 }
 
 export async function deleteEntry(date: string): Promise<void> {
   const all = await getAllEntries();
-  await AsyncStorage.setItem(KEYS.ENTRIES, JSON.stringify(all.filter(e => e.date !== date)));
+  const filtered = all.filter(e => e.date !== date);
+  await AsyncStorage.setItem(KEYS.ENTRIES, JSON.stringify(filtered));
 }
 
 export async function getEntry(date: string): Promise<WorkEntry | null> {
   const all = await getAllEntries();
-  return all.find(e => e.date === date) ?? null;
+  return all.find(e => e.date === date) || null;
 }
 
-// ─── Settings ─────────────────────────────────────────────────────────────────
-
-const DEFAULT_SETTINGS: AppSettings = {
-  ratePerUnit: 2.75,
-  caratRate: 100,
-  caratEnabled: false, // OFF by default for new installs
-};
-
+// Settings
 export async function getSettings(): Promise<AppSettings> {
   try {
     const raw = await AsyncStorage.getItem(KEYS.SETTINGS);
-    if (!raw) return { ...DEFAULT_SETTINGS };
-    const parsed: AppSettings = JSON.parse(raw);
-    // Merge defaults so new fields are present for existing users
-    return { ...DEFAULT_SETTINGS, ...parsed };
+    return raw ? JSON.parse(raw) : { ratePerUnit: 2.75, caratRate: 100 };
   } catch {
-    return { ...DEFAULT_SETTINGS };
+    return { ratePerUnit: 2.75, caratRate: 100 };
   }
 }
 
@@ -93,8 +81,7 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
   await AsyncStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
 }
 
-// ─── Date Colors ──────────────────────────────────────────────────────────────
-
+// Date Colors
 export async function getDateColors(): Promise<CustomDateColor> {
   try {
     const raw = await AsyncStorage.getItem(KEYS.DATE_COLORS);
@@ -114,8 +101,7 @@ export async function saveDateColor(date: string, color: 'red' | 'default'): Pro
   await AsyncStorage.setItem(KEYS.DATE_COLORS, JSON.stringify(colors));
 }
 
-// ─── Advance Salary (per month key = YYYY-MM) ─────────────────────────────────
-
+// Advance Salary (per month: key = YYYY-MM)
 export async function getAdvanceSalary(monthKey: string): Promise<number> {
   try {
     const raw = await AsyncStorage.getItem(`${KEYS.ADVANCE}_${monthKey}`);
@@ -129,40 +115,35 @@ export async function saveAdvanceSalary(monthKey: string, amount: number): Promi
   await AsyncStorage.setItem(`${KEYS.ADVANCE}_${monthKey}`, amount.toString());
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
+// Helpers
 export function getMonthKey(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, '0')}`;
 }
 
 export function getWeekDates(): string[] {
   const today = new Date();
-  const dayOfWeek = today.getDay();
-  return Array.from({ length: 7 }, (_, i) => {
+  const dayOfWeek = today.getDay(); // 0 = Sunday
+  const dates: string[] = [];
+  for (let i = 0; i < 7; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() - dayOfWeek + i);
-    return formatDate(d);
-  });
+    dates.push(formatDate(d));
+  }
+  return dates;
 }
 
 export function formatDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function parseDate(s: string): Date {
-  const [y, m, d] = s.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-// ─── Backup & Restore ─────────────────────────────────────────────────────────
+// ─── Backup & Restore ───────────────────────────────────────────────────────
 
 export async function exportBackup(): Promise<BackupData> {
-  const [entries, settings, dateColors] = await Promise.all([
-    getAllEntries(),
-    getSettings(),
-    getDateColors(),
-  ]);
+  const entries = await getAllEntries();
+  const settings = await getSettings();
+  const dateColors = await getDateColors();
 
+  // Collect all advance salary keys
   const allKeys = await AsyncStorage.getAllKeys();
   const advanceKeys: Array<{ key: string; value: number }> = [];
   for (const k of allKeys) {
@@ -183,12 +164,15 @@ export async function exportBackup(): Promise<BackupData> {
 }
 
 export async function importBackup(data: BackupData): Promise<void> {
-  await Promise.all([
-    AsyncStorage.setItem(KEYS.ENTRIES, JSON.stringify(data.entries)),
-    AsyncStorage.setItem(KEYS.SETTINGS, JSON.stringify(data.settings)),
-    AsyncStorage.setItem(KEYS.DATE_COLORS, JSON.stringify(data.dateColors)),
-  ]);
+  await AsyncStorage.setItem(KEYS.ENTRIES, JSON.stringify(data.entries));
+  await AsyncStorage.setItem(KEYS.SETTINGS, JSON.stringify(data.settings));
+  await AsyncStorage.setItem(KEYS.DATE_COLORS, JSON.stringify(data.dateColors));
   for (const { key, value } of data.advanceKeys) {
     await AsyncStorage.setItem(key, value.toString());
   }
+}
+
+export function parseDate(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
